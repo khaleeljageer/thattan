@@ -275,7 +275,6 @@ class Tamil99KeyboardLayout:
             if char == ' ':
                 sequence.append(('Space', False))
                 i += 1
-                continue  # Skip to next iteration after handling space
             # First, check for combined characters (consonant + vowel sign)
             # This handles cases like "டு" which should be "od", not "o" + "^d"
             elif i + 1 < len(tamil_text):

@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import html
 import re
 import os
-import json
 from pathlib import Path
 from typing import Optional
 
@@ -56,13 +55,6 @@ class MainWindow(QMainWindow):
         self._unlock_all_levels = os.environ.get("THATTACHU_UNLOCK_ALL") == "1"
         self._input_has_error = False
         
-        # Gamification stats
-        self._current_streak: int = 0
-        self._best_streak: int = 0
-        self._total_score: int = 0
-        self._combo_multiplier: float = 1.0
-        self._consecutive_correct: int = 0
-        
         # Keystroke tracking
         self._keystroke_tracker = KeystrokeTracker()
         self._tamil99_layout = Tamil99KeyboardLayout()
@@ -71,198 +63,84 @@ class MainWindow(QMainWindow):
         self._keystroke_index: int = 0
         self._char_to_keystroke_map: dict[int, int] = {}  # char_index -> keystroke_index
         self._typed_keystrokes: list[str] = []  # Track actual keys pressed
-        self._typed_tamil_text: str = ""  # Track typed Tamil text
 
         self._build_ui()
         self._refresh_levels_list()
         QTimer.singleShot(0, self.showMaximized)
 
-    def _get_theme_colors(self) -> dict:
-        """Get dark theme color palette"""
-        return {
-            'bg_main': '#1a202c',
-            'bg_container': '#2d3748',
-            'bg_card': '#4a5568',
-            'bg_input': '#4a5568',
-            'bg_hover': '#5a6578',
-            'text_primary': '#e2e8f0',
-            'text_secondary': '#cbd5e0',
-            'text_muted': '#a0aec0',
-            'border': '#4a5568',
-            'border_light': '#5a6578',
-            'highlight': '#81e6d9',
-            'highlight_bg': '#234e52',
-            'error': '#fc8181',
-            'error_bg': '#742a2a',
-            'success': '#68d391',
-            'success_bg': '#22543d',
-            'progress': '#81e6d9',
-            'key_bg': '#4a5568',
-            'key_highlight': '#81e6d9',
-            'key_highlight_bg': '#234e52',
-            'key_shift': '#f6ad55',
-            'key_shift_bg': '#7c2d12',
-        }
-
     def _build_ui(self) -> None:
         self.setWindowTitle("தட்டச்சு - தமிழ்99 பயிற்சி")
-        self.setMinimumSize(1200, 800)
-        
-        colors = self._get_theme_colors()
-        
-        self.setStyleSheet(f"""
-            QMainWindow {{ 
-                background: {colors['bg_main']};
-            }}
-        """)
+        self.setMinimumSize(980, 620)
+        self.setStyleSheet("QMainWindow { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1a1a2e, stop:1 #16213e); }")
 
         root = QWidget()
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
 
-        # Left sidebar with level cards and game stats
+        # Left sidebar with level cards
         left_panel = QVBoxLayout()
-        left_panel.setSpacing(15)
-        
-        # Stats header - simple and peaceful
-        stats_header = QLabel("📊 முன்னேற்றம்")
-        stats_header.setStyleSheet(f"""
-            font-size: 15px; 
-            font-weight: 600; 
-            color: {colors['text_secondary']}; 
-            padding: 8px 0px;
-        """)
-        left_panel.addWidget(stats_header)
-        
-        # Stats cards container - soft and minimal
-        stats_container = QWidget()
-        stats_container.setStyleSheet(f"""
-            QWidget {{
-                background: {colors['bg_container']};
-                border-radius: 12px;
-                padding: 16px;
-                border: none;
-            }}
-        """)
-        stats_layout = QVBoxLayout(stats_container)
-        stats_layout.setSpacing(12)
-        
-        # Score display - muted
-        self.score_label = QLabel("புள்ளிகள்: 0")
-        self.score_label.setStyleSheet(f"""
-            background: {colors['bg_card']};
-            color: {colors['text_primary']};
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            border-left: 3px solid {colors['text_muted']};
-        """)
-        stats_layout.addWidget(self.score_label)
-        
-        # Streak display - soft
-        self.streak_label = QLabel("தொடர்ச்சி: 0")
-        self.streak_label.setStyleSheet(f"""
-            background: {colors['bg_card']};
-            color: {colors['text_primary']};
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            border-left: 3px solid {colors['success']};
-        """)
-        stats_layout.addWidget(self.streak_label)
-        
-        # Best streak - minimal
-        self.best_streak_label = QLabel("சிறந்த தொடர்ச்சி: 0")
-        self.best_streak_label.setStyleSheet(f"""
-            background: {colors['bg_card']};
-            color: {colors['text_primary']};
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            border-left: 3px solid {colors['highlight']};
-        """)
-        stats_layout.addWidget(self.best_streak_label)
-        
-        left_panel.addWidget(stats_container)
-        
-        # Levels header - simple
         level_header = QLabel("📚 நிலைகள்")
-        level_header.setStyleSheet(f"""
-            font-size: 16px; 
-            font-weight: 600; 
-            color: {colors['text_secondary']}; 
-            padding: 12px 0px;
-        """)
+        level_header.setStyleSheet("font-size: 18px; font-weight: 600; color: #e2e8f0; padding: 8px;")
         left_panel.addWidget(level_header)
         
         self.levels_list = QListWidget()
-        self.levels_list.setStyleSheet(f"""
-            QListWidget {{
-                background: {colors['bg_container']};
+        self.levels_list.setStyleSheet("""
+            QListWidget {
+                background: #2d3748;
                 border: none;
                 border-radius: 12px;
                 padding: 8px;
-                color: {colors['text_primary']};
-            }}
-            QListWidget::item {{
-                padding: 12px 14px;
+                color: #e2e8f0;
+            }
+            QListWidget::item {
+                padding: 12px;
                 margin: 4px 0;
                 border-radius: 8px;
-                background: {colors['bg_card']};
-                color: {colors['text_secondary']};
-                border: 1px solid transparent;
-                font-size: 14px;
-                font-weight: 500;
-            }}
-            QListWidget::item:hover {{
-                background: {colors['bg_hover']};
-                border: 1px solid {colors['border_light']};
-            }}
-            QListWidget::item:selected {{
-                background: {colors['highlight_bg']};
-                color: {colors['text_primary']};
+                background: #4a5568;
+                color: #e2e8f0;
+            }
+            QListWidget::item:hover {
+                background: #5a6578;
+            }
+            QListWidget::item:selected {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #667eea, stop:1 #764ba2);
+                color: white;
                 font-weight: 600;
-                border: 1px solid {colors['highlight']};
-            }}
+            }
         """)
         self.levels_list.itemSelectionChanged.connect(self._on_level_selected)
         left_panel.addWidget(self.levels_list)
 
-        self.level_status = QLabel("தொடங்க ஒரு நிலையைத் தேர்வு செய்யவும்.")
+        self.level_status = QLabel("🎯 தொடங்க ஒரு நிலையைத் தேர்வு செய்யவும்.")
         self.level_status.setWordWrap(True)
-        self.level_status.setStyleSheet(f"""
-            background: {colors['bg_card']};
-            color: {colors['text_muted']};
-            padding: 12px 14px;
-            border-radius: 10px;
+        self.level_status.setStyleSheet("""
+            background: #2d3748;
+            color: #cbd5e0;
+            padding: 12px;
+            border-radius: 8px;
             font-size: 13px;
-            font-weight: 500;
-            border: none;
+            border-left: 4px solid #667eea;
         """)
         left_panel.addWidget(self.level_status)
 
         self.reset_button = QPushButton("🔄 முன்னேற்றத்தை மீட்டமை")
-        self.reset_button.setStyleSheet(f"""
-            QPushButton {{
-                background: {colors['bg_container']};
-                color: {colors['text_muted']};
+        self.reset_button.setStyleSheet("""
+            QPushButton {
+                background: #f56565;
+                color: white;
                 padding: 10px 16px;
                 border: none;
                 border-radius: 8px;
-                font-weight: 500;
+                font-weight: 600;
                 font-size: 13px;
-            }}
-            QPushButton:hover {{
-                background: {colors['bg_hover']};
-                color: {colors['text_secondary']};
-            }}
-            QPushButton:pressed {{
-                background: {colors['bg_card']};
-            }}
+            }
+            QPushButton:hover {
+                background: #e53e3e;
+            }
+            QPushButton:pressed {
+                background: #c53030;
+            }
         """)
         self.reset_button.clicked.connect(self._reset_progress)
         left_panel.addWidget(self.reset_button)
@@ -271,119 +149,125 @@ class MainWindow(QMainWindow):
         # Right panel with main content
         right_panel = QVBoxLayout()
         
-        # Task display section - peaceful learning style
-        task_container = QWidget()
-        task_container.setStyleSheet(f"""
-            QWidget {{
-                background: {colors['bg_container']};
-                border-radius: 16px;
-                padding: 24px;
-                border: none;
-            }}
-        """)
-        task_container_layout = QVBoxLayout(task_container)
-        task_container_layout.setContentsMargins(0, 0, 0, 0)
-        task_container_layout.setSpacing(12)
-        
-        # Task header removed - just label removed
-        # Combo multiplier display - hidden for peaceful UI
-        self.combo_label = QLabel("")
-        self.combo_label.setVisible(False)
+        task_label = QLabel("✍️ பயிற்சி வரி")
+        task_label.setStyleSheet("font-size: 16px; font-weight: 600; color: #e2e8f0; padding: 4px;")
+        right_panel.addWidget(task_label)
 
         self.task_display = QLabel()
         self.task_display.setTextFormat(Qt.RichText)
         self.task_display.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        self.task_display.setStyleSheet(f"""
-            background: {colors['bg_input']};
-            color: {colors['text_primary']};
-            border: none;
+        self.task_display.setStyleSheet("""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4a5568, stop:1 #5a6578);
+            color: #e2e8f0;
+            border: 2px solid #f9ca24;
             border-radius: 12px;
-            padding: 24px 28px;
-            font-size: 26px;
-            font-weight: 400;
-            font-family: 'Noto Sans Tamil', 'Latha', sans-serif;
-            min-height: 100px;
+            padding: 14px 18px;
+            font-size: 18px;
+            font-weight: 500;
         """)
-        self.task_display.setMinimumHeight(100)
-        task_container_layout.addWidget(self.task_display)
-        right_panel.addWidget(task_container)
+        self.task_display.setMinimumHeight(60)
+        right_panel.addWidget(self.task_display)
 
-        # Input section - peaceful learning style
-        input_container = QWidget()
-        input_container.setStyleSheet(f"""
-            QWidget {{
-                background: {colors['bg_container']};
-                border-radius: 16px;
-                padding: 24px;
-                border: none;
-            }}
-        """)
-        input_container_layout = QVBoxLayout(input_container)
-        input_container_layout.setContentsMargins(0, 0, 0, 0)
-        input_container_layout.setSpacing(12)
-        
-        # Input label removed - just label removed
+        input_label = QLabel("⌨️ இங்கே தட்டச்சு செய்யவும்")
+        input_label.setStyleSheet("font-size: 16px; font-weight: 600; color: #e2e8f0; padding: 4px;")
+        right_panel.addWidget(input_label)
         
         self.input_box = QLineEdit()
-        self.input_box.setMinimumHeight(100)
-        self.input_box.setStyleSheet(f"""
-            QLineEdit {{
-                background: {colors['bg_input']};
-                color: {colors['text_primary']};
-                border: none;
+        self.input_box.setMinimumHeight(60)
+        self.input_box.setStyleSheet("""
+            QLineEdit {
+                background: #2d3748;
+                color: #e2e8f0;
+                border: 3px solid #667eea;
                 border-radius: 12px;
-                padding: 24px 28px;
-                font-size: 26px;
-                font-weight: 400;
-                font-family: 'Noto Sans Tamil', 'Latha', sans-serif;
-            }}
-            QLineEdit:focus {{
-                border: 2px solid {colors['highlight']};
-                background: {colors['bg_container']};
-            }}
+                padding: 12px 18px;
+                font-size: 18px;
+                font-weight: 500;
+            }
+            QLineEdit:focus {
+                border: 3px solid #5a67d8;
+                background: #4a5568;
+            }
         """)
         # Install event filter to capture key presses
         self.input_box.installEventFilter(self)
         self.input_box.setReadOnly(True)  # Prevent text input, we'll handle keys manually
-        input_container_layout.addWidget(self.input_box)
-        right_panel.addWidget(input_container)
+        right_panel.addWidget(self.input_box)
 
-        # Progress section - simple and clean
-        progress_container = QWidget()
-        progress_container.setStyleSheet(f"""
-            QWidget {{
-                background: {colors['bg_container']};
-                border-radius: 12px;
-                padding: 16px;
-                border: none;
-            }}
-        """)
-        progress_layout = QVBoxLayout(progress_container)
-        progress_layout.setSpacing(10)
-        
-        # Progress header removed - just label removed
-        
         self.progress_bar = QProgressBar()
         # Progress bar range will be set dynamically based on level task count
         self.progress_bar.setRange(0, 100)
-        self.progress_bar.setStyleSheet(f"""
-            QProgressBar {{
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
                 border: none;
-                border-radius: 8px;
+                border-radius: 10px;
                 text-align: center;
-                background: {colors['bg_card']};
-                height: 24px;
-                font-weight: 500;
-                font-size: 12px;
-                color: {colors['text_muted']};
-            }}
-            QProgressBar::chunk {{
-                background: {colors['progress']};
-                border-radius: 7px;
-            }}
+                background: #2d3748;
+                height: 22px;
+                font-weight: 600;
+                color: white;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #667eea, stop:1 #764ba2);
+                border-radius: 10px;
+            }
         """)
-        progress_layout.addWidget(self.progress_bar)
-        right_panel.addWidget(progress_container)
+        right_panel.addWidget(self.progress_bar)
+
+        # Stats cards
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(12)
+        
+        self.accuracy_label = QLabel("🎯 துல்லியம்: 0%")
+        self.accuracy_label.setStyleSheet("""
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            border-left: 4px solid #48bb78;
+        """)
+        
+        self.wpm_label = QLabel("⚡ WPM: 0")
+        self.wpm_label.setStyleSheet("""
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            border-left: 4px solid #4299e1;
+        """)
+        
+        self.errors_label = QLabel("❌ பிழைகள்: 0")
+        self.errors_label.setStyleSheet("""
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            border-left: 4px solid #f56565;
+        """)
+        
+        stats_layout.addWidget(self.accuracy_label)
+        stats_layout.addWidget(self.wpm_label)
+        stats_layout.addWidget(self.errors_label)
+        stats_layout.addStretch(1)
+        right_panel.addLayout(stats_layout)
+
+        self.session_status = QLabel("")
+        self.session_status.setWordWrap(True)
+        self.session_status.setStyleSheet("""
+            background: #2d3748;
+            color: #cbd5e0;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+        """)
+        right_panel.addWidget(self.session_status)
+
         right_panel.addStretch(1)
 
         top_row = QHBoxLayout()
@@ -393,20 +277,19 @@ class MainWindow(QMainWindow):
         layout.addLayout(top_row)
 
         keyboard_header = QLabel("⌨️ தமிழ்99 விசைப்பலகை")
-        keyboard_header.setStyleSheet(f"""
+        keyboard_header.setStyleSheet("""
             font-size: 18px;
             font-weight: 600;
-            color: {colors['text_secondary']};
-            padding: 12px 0px;
+            color: #e2e8f0;
+            padding: 8px;
             background: transparent;
         """)
         layout.addWidget(keyboard_header, alignment=Qt.AlignHCenter)
         
         keyboard_container = self._build_keyboard()
-        keyboard_container.setMinimumSize(980, 400)
-        keyboard_container.setStyleSheet(f"""
-            background: {colors['bg_container']};
-            border: none;
+        keyboard_container.setMinimumSize(980, 320)
+        keyboard_container.setStyleSheet("""
+            background: #2d3748;
             border-radius: 16px;
             padding: 20px;
         """)
@@ -474,14 +357,16 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(progress.completed)
         self.task_display.setText("")
         self.input_box.setText("")
-        # Stats labels removed from main screen
+        self.session_status.setText("")
+        self.accuracy_label.setText("Accuracy: 0%")
+        self.wpm_label.setText("WPM: 0")
+        self.errors_label.setText("Errors: 0")
         self.level_status.setText(
             f"{level.name} பயிற்சி வரிகள்: {task_count}. "
             f"முடிந்தது: {progress.completed}/{task_count}."
         )
         if progress.completed >= task_count:
-            # Status message removed
-            pass
+            self.session_status.setText("இந்த நிலை முடிந்தது. மீண்டும் பயிற்சி செய்யலாம்.")
         self._start_session(level, progress.completed)
 
     def _start_session(self, level: Level, start_index: int) -> None:
@@ -493,9 +378,8 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, task_count)
         # Reset keystroke tracker for new session
         self._keystroke_tracker.reset_session()
-        # Initialize gamification stats display
-        self._update_gamification_stats()
         self._load_current_task()
+        self.session_status.setText("விசைகளை தட்டச்சு செய்யவும். ஒவ்வொரு விசையும் கண்காணிக்கப்படும்.")
 
     def _load_current_task(self) -> None:
         if not self._session:
@@ -639,12 +523,6 @@ class MainWindow(QMainWindow):
         # Get expected key (we know we're not past the sequence here)
         expected_key, needs_shift = self._keystroke_sequence[self._keystroke_index]
         
-        # Normalize space handling - both "Space" and ' ' should match
-        if expected_key == ' ':
-            expected_key = "Space"
-        if pressed_key == ' ':
-            pressed_key = "Space"
-        
         # Record the keystroke
         result = self._keystroke_tracker.record_stroke(pressed_key, expected_key)
         
@@ -658,17 +536,13 @@ class MainWindow(QMainWindow):
             
             self._input_has_error = False
             self._set_input_error_state(False)
-            
-            # Update display immediately after reconstructing text
-            self._update_display_from_keystrokes()
         else:
             # Mark error but don't advance
             self._input_has_error = True
             self._set_input_error_state(True)
-            # Still update display to show error state
-            self._update_display_from_keystrokes()
         
-        # Update keyboard hint and stats
+        # Update display
+        self._update_display_from_keystrokes()
         self._update_keyboard_hint()
         self._update_stats_from_tracker()
         
@@ -696,8 +570,6 @@ class MainWindow(QMainWindow):
                     reconstructed += " "
                     keystroke_idx += 1
                 i += 1
-                continue
-            
             # Check for combined characters first
             elif i + 1 < len(target):
                 combined = char + target[i + 1]
@@ -718,7 +590,6 @@ class MainWindow(QMainWindow):
                             keystroke_idx += len(key_seq)
                             i += 2
                             continue
-            
             # Single character
             if char in self._tamil99_layout.CHAR_TO_KEYSTROKES:
                 key_seq = self._tamil99_layout.CHAR_TO_KEYSTROKES[char]
@@ -804,8 +675,10 @@ class MainWindow(QMainWindow):
     def _update_stats_from_tracker(self) -> None:
         """Update UI stats from keystroke tracker"""
         summary = self._keystroke_tracker.get_session_summary()
-        # Update gamification stats
-        self._update_gamification_stats()
+        
+        self.accuracy_label.setText(f"🎯 துல்லியம்: {summary['overall_accuracy']:.1f}%")
+        self.wpm_label.setText(f"⚡ வேகம்: {summary['typing_speed']:.1f} SPM")
+        self.errors_label.setText(f"❌ பிழைகள்: {summary['incorrect_strokes']}")
     
     def _on_input_changed(self, text: str) -> None:
         """Legacy method - no longer used but kept for compatibility"""
@@ -835,45 +708,14 @@ class MainWindow(QMainWindow):
         self._update_keyboard_hint()
 
     def _update_stats(self, result: TaskResult) -> None:
-        # Update gamification when task is completed
-        if result.accuracy == 100.0:
-            # Perfect score - increase streak
-            self._current_streak += 1
-            if self._current_streak > self._best_streak:
-                self._best_streak = self._current_streak
-            # Calculate score: base points + streak bonus
-            base_points = 10
-            streak_bonus = self._current_streak * 2
-            self._total_score += int((base_points + streak_bonus) * self._combo_multiplier)
-            self._consecutive_correct += 1
-        else:
-            # Reset streak on error
-            self._current_streak = 0
-            self._consecutive_correct = 0
-        
-        # Update combo multiplier based on consecutive correct
-        if self._consecutive_correct >= 10:
-            self._combo_multiplier = 2.0
-        elif self._consecutive_correct >= 5:
-            self._combo_multiplier = 1.5
-        else:
-            self._combo_multiplier = 1.0
-        
-        self._update_gamification_stats()
-    
-    def _update_gamification_stats(self) -> None:
-        """Update gamification UI elements - peaceful style"""
-        self.score_label.setText(f"புள்ளிகள்: {self._total_score:,}")
-        self.streak_label.setText(f"தொடர்ச்சி: {self._current_streak}")
-        self.best_streak_label.setText(f"சிறந்த தொடர்ச்சி: {self._best_streak}")
-        
-        # Combo multiplier hidden for peaceful UI
-        self.combo_label.setVisible(False)
+        self.accuracy_label.setText(f"🎯 துல்லியம்: {result.accuracy:.1f}%")
+        self.wpm_label.setText(f"⚡ WPM: {result.wpm:.1f}")
+        self.errors_label.setText(f"❌ பிழைகள்: {result.errors}")
 
     def _level_completed(self) -> None:
         self.task_display.setText("நிலை முடிந்தது! அடுத்த நிலையைத் தேர்வு செய்யவும்.")
         self._set_input_text("")
-        # Status message removed
+        self.session_status.setText("மிகச் சிறப்பு! அடுத்த நிலை திறக்கப்பட்டது.")
         QMessageBox.information(self, "நிலை முடிந்தது", "இந்த நிலையை நீங்கள் முடித்துவிட்டீர்கள்!")
         self._refresh_levels_list()
         self._clear_keyboard_highlight()
@@ -887,7 +729,7 @@ class MainWindow(QMainWindow):
         if confirm == QMessageBox.Yes:
             self._progress_store.reset()
             self._refresh_levels_list()
-            # Status message removed
+            self.session_status.setText("முன்னேற்றம் மீட்டமைக்கப்பட்டது.")
 
     def _build_keyboard(self) -> QWidget:
         container = QWidget()
@@ -895,19 +737,18 @@ class MainWindow(QMainWindow):
         grid.setSpacing(8)
         container.setStyleSheet("background: #2d3748; border-radius: 12px; padding: 16px;")
 
-        colors = self._get_theme_colors()
-        key_style = f"""
-            QLabel {{
-                background: {colors['key_bg']};
-                color: {colors['text_primary']};
-                border: none;
-                border-radius: 6px;
-                padding: 12px 8px;
-                font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';
-                font-size: 18px;
-                font-weight: 400;
-            }}
-        """
+        key_style = (
+            "QLabel {"
+            "  background: #4a5568;"
+            "  color: #e2e8f0;"
+            "  border: none;"
+            "  border-radius: 6px;"
+            "  padding: 12px 8px;"
+            "  font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';"
+            "  font-size: 18px;"
+            "  font-weight: 500;"
+            "}"
+        )
 
         size_map = {
             "Backspace": 2.0,
@@ -955,10 +796,9 @@ class MainWindow(QMainWindow):
                 label.setStyleSheet(key_style)
                 label.setMinimumHeight(44)
                 label.setMinimumWidth(int(unit_pixels * size * unit_scale))
-                colors = self._get_theme_colors()
                 if key in special_labels:
                     label.setText(html.escape(special_labels[key]))
-                    label.setStyleSheet(key_style + f"QLabel {{ font-size: 14px; color: {colors['text_muted']}; }}")
+                    label.setStyleSheet(key_style + "QLabel { font-size: 14px; color: #cbd5e0; }")
                 else:
                     english = html.escape(key)
                     tamil_base = html.escape(display[0]) if display[0] else ""
@@ -966,9 +806,9 @@ class MainWindow(QMainWindow):
                     label.setText(
                         '<table style="width:100%; height:100%; border-collapse:collapse;">'
                         "<tr>"
-                        f'<td style="font-size:10px; color:{colors["text_muted"]}; vertical-align:top; text-align:left;">{english}</td>'
+                        f'<td style="font-size:10px; color:#cbd5e0; vertical-align:top; text-align:left;">{english}</td>'
                         '<td style="width:6px;"></td>'
-                        f'<td style="font-size:12px; color:{colors["text_muted"]}; vertical-align:top; text-align:right;">{tamil_shift}</td>'
+                        f'<td style="font-size:12px; color:#cbd5e0; vertical-align:top; text-align:right;">{tamil_shift}</td>'
                         "</tr>"
                         "<tr>"
                         f'<td style="font-size:18px; font-weight:600; vertical-align:bottom; text-align:center;">{tamil_base}</td>'
@@ -994,50 +834,48 @@ class MainWindow(QMainWindow):
         return container
 
     def _clear_keyboard_highlight(self) -> None:
-        colors = self._get_theme_colors()
         for label in self._highlighted_keys:
-            label.setStyleSheet(f"""
-                QLabel {{
-                    background: {colors['key_bg']};
-                    color: {colors['text_primary']};
-                    border: none;
-                    border-radius: 6px;
-                    padding: 12px 8px;
-                    font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';
-                    font-size: 18px;
-                    font-weight: 400;
-                }}
-            """)
+            label.setStyleSheet(
+                "QLabel {"
+                "  background: #4a5568;"
+                "  color: #e2e8f0;"
+                "  border: none;"
+                "  border-radius: 6px;"
+                "  padding: 12px 8px;"
+                "  font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';"
+                "  font-size: 18px;"
+                "  font-weight: 500;"
+                "}"
+            )
         self._highlighted_keys = []
 
     def _highlight_key(self, label: QLabel, is_shift: bool = False) -> None:
-        colors = self._get_theme_colors()
         if is_shift:
-            style = f"""
-                QLabel {{
-                    background: {colors['key_shift_bg']};
-                    color: {colors['text_primary']};
-                    border: 2px solid {colors['key_shift']};
-                    border-radius: 6px;
-                    padding: 12px 8px;
-                    font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';
-                    font-size: 18px;
-                    font-weight: 500;
-                }}
-            """
+            style = (
+                "QLabel {"
+                "  background: #ed8936;"
+                "  color: #ffffff;"
+                "  border: none;"
+                "  border-radius: 6px;"
+                "  padding: 12px 8px;"
+                "  font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';"
+                "  font-size: 18px;"
+                "  font-weight: 600;"
+                "}"
+            )
         else:
-            style = f"""
-                QLabel {{
-                    background: {colors['key_highlight_bg']};
-                    color: {colors['text_primary']};
-                    border: 2px solid {colors['key_highlight']};
-                    border-radius: 6px;
-                    padding: 12px 8px;
-                    font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';
-                    font-size: 18px;
-                    font-weight: 500;
-                }}
-            """
+            style = (
+                "QLabel {"
+                "  background: #667eea;"
+                "  color: #ffffff;"
+                "  border: none;"
+                "  border-radius: 6px;"
+                "  padding: 12px 8px;"
+                "  font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';"
+                "  font-size: 18px;"
+                "  font-weight: 600;"
+                "}"
+            )
         label.setStyleSheet(style)
         self._highlighted_keys.append(label)
 
@@ -1051,10 +889,6 @@ class MainWindow(QMainWindow):
             key_label, needs_shift = self._keystroke_sequence[self._keystroke_index]
             self._clear_keyboard_highlight()
             
-            # Handle space character - map it to "Space" key label
-            if key_label == ' ' or key_label == 'Space':
-                key_label = "Space"
-            
             if key_label in self._key_labels:
                 self._highlight_key(self._key_labels[key_label])
             if needs_shift:
@@ -1066,19 +900,18 @@ class MainWindow(QMainWindow):
             if "Space" in self._key_labels:
                 # Use a different color to indicate "next task" action
                 space_label = self._key_labels["Space"]
-                colors = self._get_theme_colors()
-                space_label.setStyleSheet(f"""
-                    QLabel {{
-                        background: {colors['success_bg']};
-                        color: {colors['text_primary']};
-                        border: 2px solid {colors['success']};
-                        border-radius: 6px;
-                        padding: 12px 8px;
-                        font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';
-                        font-size: 18px;
-                        font-weight: 500;
-                    }}
-                """)
+                space_label.setStyleSheet(
+                    "QLabel {"
+                    "  background: #48bb78;"
+                    "  color: #ffffff;"
+                    "  border: 2px solid #38a169;"
+                    "  border-radius: 6px;"
+                    "  padding: 12px 8px;"
+                    "  font-family: 'Noto Sans Tamil', 'Latha', 'Sans Serif';"
+                    "  font-size: 18px;"
+                    "  font-weight: 600;"
+                    "}"
+                )
                 self._highlighted_keys.append(space_label)
     
     def _build_keystroke_sequence(self, text: str) -> list[tuple[str, bool]]:
@@ -1262,8 +1095,23 @@ class MainWindow(QMainWindow):
     def _update_task_display_for_typed(self, typed: str, target: str, is_error: bool) -> None:
         if not target:
             return
-        # Always keep offset at 0 - no text movement animation
-        self._task_display_offset = 0
+        if not target.startswith(typed):
+            self._task_display_offset = 0
+            self._render_task_display(typed, target, is_error)
+            return
+
+        offset = self._task_display_offset
+        if typed.endswith(" "):
+            offset = len(typed)
+        elif len(typed) < self._task_display_offset:
+            last_space = typed.rfind(" ")
+            offset = last_space + 1 if last_space != -1 else 0
+
+        while offset < len(target) and target[offset] == " ":
+            offset += 1
+
+        if offset != self._task_display_offset:
+            self._task_display_offset = offset
         self._render_task_display(typed, target, is_error)
 
     def _render_task_display(self, typed: str, target: str, is_error: bool) -> None:
@@ -1271,79 +1119,39 @@ class MainWindow(QMainWindow):
             self.task_display.setText("")
             return
 
-        colors = self._get_theme_colors()
-        
-        # First check if the task is complete - typed text matches target
-        # This handles the case where user has completed typing the word
-        if typed and typed == target:
-            # Task is complete - show everything as completed
-            completed = html.escape(target)
-            html_text = f'<span style="color:{colors["success"]};">{completed}</span>'
-            self.task_display.setText(html_text)
-            return
-        
-        # If not complete, determine what's been typed and what's remaining
-        typed_len = len(typed) if typed else 0
-        target_len = len(target)
-        
-        if typed_len >= target_len:
-            # All typed (should have been caught above, but handle it anyway)
-            completed = html.escape(target)
-            html_text = f'<span style="color:{colors["success"]};">{completed}</span>'
-            self.task_display.setText(html_text)
-            return
-        
-        # Partially typed - find matching prefix
-        match_len = 0
-        for i in range(min(typed_len, target_len)):
-            if i < len(typed) and i < len(target) and typed[i] == target[i]:
-                match_len = i + 1
-            else:
-                break
-        
-        completed_text = target[:match_len] if match_len > 0 else ""
-        remaining_text = target[match_len:] if match_len < target_len else ""
-        
-        # Split remaining into current character and rest
-        if remaining_text:
-            # Find next space to determine word/character boundary
-            space_pos = remaining_text.find(' ')
-            if space_pos > 0:
-                # Next character is before space
-                current_char = remaining_text[:space_pos]
-                remaining = remaining_text[space_pos:]
-            elif space_pos == 0:
-                # Next is a space
-                current_char = ' '
-                remaining = remaining_text[1:]
-            else:
-                # No space found - take all remaining as current character
-                current_char = remaining_text
-                remaining = ""
-        else:
-            current_char = ""
-            remaining = ""
-        
-        # Escape HTML
-        completed_escaped = html.escape(completed_text)
-        current_char_escaped = html.escape(current_char)
-        remaining_escaped = html.escape(remaining)
-        
-        # Build HTML
-        if not current_char and not remaining:
-            # All completed
-            html_text = f'<span style="color:{colors["success"]};">{completed_escaped}</span>'
-        else:
-            # Style for current character
-            current_style = f"background:{colors['highlight_bg']}; color:{colors['text_primary']}; font-weight:500; padding:2px 4px; border-radius:4px;"
-            if is_error:
-                current_style = f"background:{colors['error_bg']}; color:{colors['text_primary']}; font-weight:500; padding:2px 4px; border-radius:4px;"
-            
-            html_text = (
-                f'<span style="color:{colors["success"]};">{completed_escaped}</span>'
-                f'<span style="{current_style}">{current_char_escaped}</span>'
-                f'<span style="color:{colors["text_muted"]};">{remaining_escaped}</span>'
-            )
+        offset = self._task_display_offset
+        if offset > len(target):
+            offset = 0
+            self._task_display_offset = 0
+
+        visible = target[offset:]
+        typed_in_view = max(0, min(len(typed) - offset, len(visible)))
+
+        prefix_text = visible[:typed_in_view]
+        remaining = visible[typed_in_view:]
+
+        word_start = 0
+        while word_start < len(remaining) and remaining[word_start] == " ":
+            word_start += 1
+        word_end = word_start
+        while word_end < len(remaining) and remaining[word_end] != " ":
+            word_end += 1
+
+        before = html.escape(prefix_text)
+        gap = html.escape(remaining[:word_start])
+        word = html.escape(remaining[word_start:word_end])
+        after = html.escape(remaining[word_end:])
+
+        word_style = "background:#f9ca24; color:#1a1a2e; font-weight:600;"
+        if is_error:
+            word_style = "background:#ff6b6b; color:#ffffff; font-weight:600;"
+
+        html_text = (
+            '<span style="color:#718096;">{}</span>'
+            '<span style="color:#cbd5e0;">{}</span>'
+            '<span style="{}">{}</span>'
+            '<span style="color:#cbd5e0;">{}</span>'
+        ).format(before, gap, word_style, word, after)
 
         self.task_display.setText(html_text)
 
@@ -1351,37 +1159,34 @@ class MainWindow(QMainWindow):
         if self._input_has_error == is_error:
             return
         self._input_has_error = is_error
-        colors = self._get_theme_colors()
         if is_error:
-            self.input_box.setStyleSheet(f"""
-                QLineEdit {{
-                    background: {colors['bg_input']};
-                    color: {colors['text_primary']};
-                    border: 2px solid {colors['error']};
+            self.input_box.setStyleSheet("""
+                QLineEdit {
+                    background: #4a1a1a;
+                    color: #ff6b6b;
+                    border: 3px solid #fc8181;
                     border-radius: 12px;
-                    padding: 24px 28px;
-                    font-size: 26px;
-                    font-weight: 400;
-                    font-family: 'Noto Sans Tamil', 'Latha', sans-serif;
-                }}
+                    padding: 12px 18px;
+                    font-size: 18px;
+                    font-weight: 500;
+                }
             """)
-            # Error status message removed
+            self.session_status.setText("பிழை உள்ளது: வெளிப்படுத்தப்பட்ட சொலை சரி செய்யவும்.")
         else:
-            self.input_box.setStyleSheet(f"""
-                QLineEdit {{
-                    background: {colors['bg_input']};
-                    color: {colors['text_primary']};
-                    border: 1px solid {colors['border_light']};
+            self.input_box.setStyleSheet("""
+                QLineEdit {
+                    background: #2d3748;
+                    color: #e2e8f0;
+                    border: 3px solid #667eea;
                     border-radius: 12px;
-                    padding: 24px 28px;
-                    font-size: 26px;
-                    font-weight: 400;
-                    font-family: 'Noto Sans Tamil', 'Latha', sans-serif;
-                }}
-                QLineEdit:focus {{
-                    border: 2px solid {colors['highlight']};
-                    background: {colors['bg_container']};
-                }}
+                    padding: 12px 18px;
+                    font-size: 18px;
+                    font-weight: 500;
+                }
+                QLineEdit:focus {
+                    border: 3px solid #5a67d8;
+                    background: #4a5568;
+                }
             """)
 
     def _apply_responsive_fonts(self) -> None:
