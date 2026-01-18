@@ -121,11 +121,9 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(20)
 
-        # Left sidebar with level cards and game stats
         left_panel = QVBoxLayout()
         left_panel.setSpacing(15)
         
-        # Stats header - simple and peaceful
         stats_header = QLabel("📊 முன்னேற்றம்")
         stats_header.setStyleSheet(f"""
             font-size: 15px; 
@@ -135,7 +133,6 @@ class MainWindow(QMainWindow):
         """)
         left_panel.addWidget(stats_header)
         
-        # Stats cards container - soft and minimal
         stats_container = QWidget()
         stats_container.setStyleSheet(f"""
             QWidget {{
@@ -148,7 +145,6 @@ class MainWindow(QMainWindow):
         stats_layout = QVBoxLayout(stats_container)
         stats_layout.setSpacing(12)
         
-        # Score display - muted
         self.score_label = QLabel("புள்ளிகள்: 0")
         self.score_label.setStyleSheet(f"""
             background: {colors['bg_card']};
@@ -161,7 +157,6 @@ class MainWindow(QMainWindow):
         """)
         stats_layout.addWidget(self.score_label)
         
-        # Streak display - soft
         self.streak_label = QLabel("தொடர்ச்சி: 0")
         self.streak_label.setStyleSheet(f"""
             background: {colors['bg_card']};
@@ -174,7 +169,6 @@ class MainWindow(QMainWindow):
         """)
         stats_layout.addWidget(self.streak_label)
         
-        # Best streak - minimal
         self.best_streak_label = QLabel("சிறந்த தொடர்ச்சி: 0")
         self.best_streak_label.setStyleSheet(f"""
             background: {colors['bg_card']};
@@ -189,7 +183,6 @@ class MainWindow(QMainWindow):
         
         left_panel.addWidget(stats_container)
         
-        # Levels header - simple
         level_header = QLabel("📚 நிலைகள்")
         level_header.setStyleSheet(f"""
             font-size: 16px; 
@@ -268,10 +261,8 @@ class MainWindow(QMainWindow):
         left_panel.addWidget(self.reset_button)
         left_panel.addStretch(1)
 
-        # Right panel with main content
         right_panel = QVBoxLayout()
         
-        # Task display section - peaceful learning style
         task_container = QWidget()
         task_container.setStyleSheet(f"""
             QWidget {{
@@ -285,8 +276,6 @@ class MainWindow(QMainWindow):
         task_container_layout.setContentsMargins(0, 0, 0, 0)
         task_container_layout.setSpacing(12)
         
-        # Task header removed - just label removed
-        # Combo multiplier display - hidden for peaceful UI
         self.combo_label = QLabel("")
         self.combo_label.setVisible(False)
 
@@ -308,7 +297,6 @@ class MainWindow(QMainWindow):
         task_container_layout.addWidget(self.task_display)
         right_panel.addWidget(task_container)
 
-        # Input section - peaceful learning style
         input_container = QWidget()
         input_container.setStyleSheet(f"""
             QWidget {{
@@ -321,8 +309,6 @@ class MainWindow(QMainWindow):
         input_container_layout = QVBoxLayout(input_container)
         input_container_layout.setContentsMargins(0, 0, 0, 0)
         input_container_layout.setSpacing(12)
-        
-        # Input label removed - just label removed
         
         self.input_box = QLineEdit()
         self.input_box.setMinimumHeight(100)
@@ -342,13 +328,11 @@ class MainWindow(QMainWindow):
                 background: {colors['bg_container']};
             }}
         """)
-        # Install event filter to capture key presses
         self.input_box.installEventFilter(self)
         self.input_box.setReadOnly(True)  # Prevent text input, we'll handle keys manually
         input_container_layout.addWidget(self.input_box)
         right_panel.addWidget(input_container)
 
-        # Progress section - simple and clean
         progress_container = QWidget()
         progress_container.setStyleSheet(f"""
             QWidget {{
@@ -361,10 +345,7 @@ class MainWindow(QMainWindow):
         progress_layout = QVBoxLayout(progress_container)
         progress_layout.setSpacing(10)
         
-        # Progress header removed - just label removed
-        
         self.progress_bar = QProgressBar()
-        # Progress bar range will be set dynamically based on level task count
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setStyleSheet(f"""
             QProgressBar {{
@@ -469,18 +450,15 @@ class MainWindow(QMainWindow):
         task_count = len(level.tasks)
         self._current_level = level
         self._session = None
-        # Set progress bar range based on task count
         self.progress_bar.setRange(0, task_count)
         self.progress_bar.setValue(progress.completed)
         self.task_display.setText("")
         self.input_box.setText("")
-        # Stats labels removed from main screen
         self.level_status.setText(
             f"{level.name} பயிற்சி வரிகள்: {task_count}. "
             f"முடிந்தது: {progress.completed}/{task_count}."
         )
         if progress.completed >= task_count:
-            # Status message removed
             pass
         self._start_session(level, progress.completed)
 
@@ -493,7 +471,6 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, task_count)
         # Reset keystroke tracker for new session
         self._keystroke_tracker.reset_session()
-        # Initialize gamification stats display
         self._update_gamification_stats()
         self._load_current_task()
 
@@ -595,26 +572,20 @@ class MainWindow(QMainWindow):
         if not self._session:
             return False
         
-        # Get the pressed key
         key = event.key()
         text = event.text()
         
-        # Handle special keys - check space first (even when task is complete)
         if key == Qt.Key.Key_Space:
-            # If task is complete, space submits and moves to next task
             if self._keystroke_index >= len(self._keystroke_sequence):
                 self._submit_task_from_keystrokes()
                 return True
-            # Otherwise, space is part of the task - need to check we're not past the sequence
             if self._keystroke_index >= len(self._keystroke_sequence):
                 return False
             pressed_key = "Space"
         elif key == Qt.Key.Key_Backspace:
-            # Allow backspace to correct mistakes
             if self._typed_keystrokes and self._keystroke_index > 0:
                 self._typed_keystrokes.pop()
                 self._keystroke_index -= 1
-                # Reconstruct Tamil text from remaining keystrokes
                 self._update_typed_tamil_text_from_keystrokes()
                 self._input_has_error = False
                 self._set_input_error_state(False)
@@ -622,58 +593,42 @@ class MainWindow(QMainWindow):
                 self._update_keyboard_hint()
             return True
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            # Submit if complete
             if self._keystroke_index >= len(self._keystroke_sequence):
                 self._submit_task_from_keystrokes()
             return True
         elif text and text.isprintable():
-            # Get the key label (uppercase for letters)
-            # But first check if task is complete - ignore other keys if so
             if self._keystroke_index >= len(self._keystroke_sequence):
                 return False
             pressed_key = text.upper() if text.isalpha() else text
         else:
-            # Ignore other keys
             return False
         
-        # Get expected key (we know we're not past the sequence here)
         expected_key, needs_shift = self._keystroke_sequence[self._keystroke_index]
         
-        # Normalize space handling - both "Space" and ' ' should match
         if expected_key == ' ':
             expected_key = "Space"
         if pressed_key == ' ':
             pressed_key = "Space"
         
-        # Record the keystroke
         result = self._keystroke_tracker.record_stroke(pressed_key, expected_key)
         
-        # Update typed keystrokes
         if result['is_correct']:
             self._typed_keystrokes.append(pressed_key)
             self._keystroke_index += 1
             
-            # Reconstruct Tamil text from typed keystrokes
             self._update_typed_tamil_text_from_keystrokes()
             
             self._input_has_error = False
             self._set_input_error_state(False)
             
-            # Update display immediately after reconstructing text
             self._update_display_from_keystrokes()
         else:
-            # Mark error but don't advance
             self._input_has_error = True
             self._set_input_error_state(True)
-            # Still update display to show error state
             self._update_display_from_keystrokes()
         
-        # Update keyboard hint and stats
         self._update_keyboard_hint()
         self._update_stats_from_tracker()
-        
-        # Note: Task completion no longer auto-submits
-        # User must press space to move to next task
         
         return True
     
@@ -808,11 +763,9 @@ class MainWindow(QMainWindow):
         if not self._session:
             return
         
-        # Use the tracked Tamil text (should match target at this point)
         typed = self._typed_tamil_text if self._typed_tamil_text else self._current_task_text
         self._submit_task(typed)
         
-        # Reset for next task
         self._typed_keystrokes = []
         self._typed_tamil_text = ""
         self._keystroke_index = 0
@@ -821,7 +774,6 @@ class MainWindow(QMainWindow):
     def _update_stats_from_tracker(self) -> None:
         """Update UI stats from keystroke tracker"""
         summary = self._keystroke_tracker.get_session_summary()
-        # Update gamification stats
         self._update_gamification_stats()
     
     def _on_input_changed(self, text: str) -> None:
@@ -852,23 +804,18 @@ class MainWindow(QMainWindow):
         self._update_keyboard_hint()
 
     def _update_stats(self, result: TaskResult) -> None:
-        # Update gamification when task is completed
         if result.accuracy == 100.0:
-            # Perfect score - increase streak
             self._current_streak += 1
             if self._current_streak > self._best_streak:
                 self._best_streak = self._current_streak
-            # Calculate score: base points + streak bonus
             base_points = 10
             streak_bonus = self._current_streak * 2
             self._total_score += int((base_points + streak_bonus) * self._combo_multiplier)
             self._consecutive_correct += 1
         else:
-            # Reset streak on error
             self._current_streak = 0
             self._consecutive_correct = 0
         
-        # Update combo multiplier based on consecutive correct
         if self._consecutive_correct >= 10:
             self._combo_multiplier = 2.0
         elif self._consecutive_correct >= 5:
@@ -884,13 +831,11 @@ class MainWindow(QMainWindow):
         self.streak_label.setText(f"தொடர்ச்சி: {self._current_streak}")
         self.best_streak_label.setText(f"சிறந்த தொடர்ச்சி: {self._best_streak}")
         
-        # Combo multiplier hidden for peaceful UI
         self.combo_label.setVisible(False)
 
     def _level_completed(self) -> None:
         self.task_display.setText("நிலை முடிந்தது! அடுத்த நிலையைத் தேர்வு செய்யவும்.")
         self._set_input_text("")
-        # Status message removed
         QMessageBox.information(self, "நிலை முடிந்தது", "இந்த நிலையை நீங்கள் முடித்துவிட்டீர்கள்!")
         self._refresh_levels_list()
         self._clear_keyboard_highlight()
@@ -904,7 +849,6 @@ class MainWindow(QMainWindow):
         if confirm == QMessageBox.Yes:
             self._progress_store.reset()
             self._refresh_levels_list()
-            # Status message removed
 
     def _build_keyboard(self) -> QWidget:
         container = QWidget()
@@ -1063,12 +1007,10 @@ class MainWindow(QMainWindow):
             self._clear_keyboard_highlight()
             return
 
-        # Use keystroke sequence for guidance
         if self._keystroke_index < len(self._keystroke_sequence):
             key_label, needs_shift = self._keystroke_sequence[self._keystroke_index]
             self._clear_keyboard_highlight()
             
-            # Handle space character - map it to "Space" key label
             if key_label == ' ' or key_label == 'Space':
                 key_label = "Space"
             
@@ -1081,7 +1023,6 @@ class MainWindow(QMainWindow):
             # Task is complete - highlight space bar to indicate user should press space for next task
             self._clear_keyboard_highlight()
             if "Space" in self._key_labels:
-                # Use a different color to indicate "next task" action
                 space_label = self._key_labels["Space"]
                 colors = self._get_theme_colors()
                 space_label.setStyleSheet(f"""
@@ -1279,7 +1220,6 @@ class MainWindow(QMainWindow):
     def _update_task_display_for_typed(self, typed: str, target: str, is_error: bool) -> None:
         if not target:
             return
-        # Always keep offset at 0 - no text movement animation
         self._task_display_offset = 0
         self._render_task_display(typed, target, is_error)
 
@@ -1290,27 +1230,21 @@ class MainWindow(QMainWindow):
 
         colors = self._get_theme_colors()
         
-        # First check if the task is complete - typed text matches target
-        # This handles the case where user has completed typing the word
         if typed and typed == target:
-            # Task is complete - show everything as completed
             completed = html.escape(target)
             html_text = f'<span style="color:{colors["success"]};">{completed}</span>'
             self.task_display.setText(html_text)
             return
         
-        # If not complete, determine what's been typed and what's remaining
         typed_len = len(typed) if typed else 0
         target_len = len(target)
         
         if typed_len >= target_len:
-            # All typed (should have been caught above, but handle it anyway)
             completed = html.escape(target)
             html_text = f'<span style="color:{colors["success"]};">{completed}</span>'
             self.task_display.setText(html_text)
             return
         
-        # Partially typed - find matching prefix
         match_len = 0
         for i in range(min(typed_len, target_len)):
             if i < len(typed) and i < len(target) and typed[i] == target[i]:
@@ -1321,37 +1255,28 @@ class MainWindow(QMainWindow):
         completed_text = target[:match_len] if match_len > 0 else ""
         remaining_text = target[match_len:] if match_len < target_len else ""
         
-        # Split remaining into current character and rest
         if remaining_text:
-            # Find next space to determine word/character boundary
             space_pos = remaining_text.find(' ')
             if space_pos > 0:
-                # Next character is before space
                 current_char = remaining_text[:space_pos]
                 remaining = remaining_text[space_pos:]
             elif space_pos == 0:
-                # Next is a space
                 current_char = ' '
                 remaining = remaining_text[1:]
             else:
-                # No space found - take all remaining as current character
                 current_char = remaining_text
                 remaining = ""
         else:
             current_char = ""
             remaining = ""
         
-        # Escape HTML
         completed_escaped = html.escape(completed_text)
         current_char_escaped = html.escape(current_char)
         remaining_escaped = html.escape(remaining)
         
-        # Build HTML
         if not current_char and not remaining:
-            # All completed
             html_text = f'<span style="color:{colors["success"]};">{completed_escaped}</span>'
         else:
-            # Style for current character
             current_style = f"background:{colors['highlight_bg']}; color:{colors['text_primary']}; font-weight:500; padding:2px 4px; border-radius:4px;"
             if is_error:
                 current_style = f"background:{colors['error_bg']}; color:{colors['text_primary']}; font-weight:500; padding:2px 4px; border-radius:4px;"
@@ -1382,7 +1307,6 @@ class MainWindow(QMainWindow):
                     font-family: 'Noto Sans Tamil', 'Latha', sans-serif;
                 }}
             """)
-            # Error status message removed
         else:
             self.input_box.setStyleSheet(f"""
                 QLineEdit {{
