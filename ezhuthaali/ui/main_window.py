@@ -608,7 +608,7 @@ class MainWindow(QMainWindow):
         # Single parent container for Finger UI and Keyboard
         self._bottom_container = QWidget()
         self._bottom_container.setStyleSheet(f"""
-            background: {colors['bg_container']};
+            background: transparent;
             border-radius: 16px;
             padding: 20px;
         """)
@@ -630,7 +630,7 @@ class MainWindow(QMainWindow):
         self._finger_guidance_label.setTextFormat(Qt.RichText)
         self._finger_guidance_label.setStyleSheet(f"""
             QLabel {{
-                background: {colors['bg_card']};
+                background: transparent;
                 color: {colors['text_primary']};
                 border-radius: 10px;
                 padding: 12px 16px;
@@ -1915,26 +1915,18 @@ class MainWindow(QMainWindow):
         pixmap = QPixmap(size.width(), size.height())
         pixmap.fill(Qt.transparent)
         
-        # Render SVG scaled to fit window (cover mode)
+        # Render SVG scaled to match window size exactly
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Calculate scale to cover the entire window
+        # Scale SVG to match window dimensions exactly
         svg_size = self._background_svg_renderer.defaultSize()
         if svg_size.width() > 0 and svg_size.height() > 0:
             scale_x = size.width() / svg_size.width()
             scale_y = size.height() / svg_size.height()
-            scale = max(scale_x, scale_y)  # Cover mode
             
-            scaled_width = svg_size.width() * scale
-            scaled_height = svg_size.height() * scale
-            
-            # Center the scaled image
-            x = (size.width() - scaled_width) / 2
-            y = (size.height() - scaled_height) / 2
-            
-            painter.translate(x, y)
-            painter.scale(scale, scale)
+            # Scale to match window size exactly (stretches if aspect ratios differ)
+            painter.scale(scale_x, scale_y)
             self._background_svg_renderer.render(painter)
         
         painter.end()
