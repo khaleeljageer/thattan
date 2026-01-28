@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer, QObject, QSize
-from PySide6.QtGui import QFont, QShortcut, QKeyEvent, QPixmap, QGuiApplication, QFontDatabase
+from PySide6.QtGui import QFont, QShortcut, QKeyEvent, QPixmap, QGuiApplication, QFontDatabase, QPainter
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
@@ -122,6 +123,11 @@ class MainWindow(QMainWindow):
         self._bottom_container: Optional[QWidget] = None
         self._keyboard_font_sizes: dict[str, int] = {}  # Store current font sizes
         self._finger_guidance_label: Optional[QLabel] = None
+        
+        # Background SVG
+        self._background_svg_path: Optional[Path] = None
+        self._background_svg_renderer: Optional[QSvgRenderer] = None
+        self._background_label: Optional[QLabel] = None
         
         # Finger mapping for QWERTY/Tamil99 layout
         self._key_to_finger = self._build_finger_mapping()
@@ -321,13 +327,28 @@ class MainWindow(QMainWindow):
         
         colors = self._get_theme_colors()
         
+        # Set fallback background color
         self.setStyleSheet(f"""
             QMainWindow {{ 
                 background: {colors['bg_main']};
             }}
         """)
-
+        
+        # Setup background SVG
+        background_svg_path = Path(__file__).parent.parent / "assets" / "background.svg"
+        if background_svg_path.exists():
+            self._background_svg_path = background_svg_path
+            self._background_svg_renderer = QSvgRenderer(str(background_svg_path))
+        
         root = QWidget()
+        
+        # Create background label for SVG (as child of main window to cover entire window)
+        if self._background_svg_renderer:
+            self._background_label = QLabel(self)
+            self._background_label.setAlignment(Qt.AlignCenter)
+            self._background_label.lower()  # Put it behind everything
+            self._background_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)  # Allow clicks to pass through
+        
         layout = QVBoxLayout(root)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(20)
@@ -665,6 +686,9 @@ class MainWindow(QMainWindow):
         self._bottom_container.installEventFilter(self)
         
         self.setCentralWidget(root)
+        
+        # Update background after window is set up
+        self._update_background()
 
         self.start_shortcut = QShortcut(Qt.CTRL | Qt.Key_Return, self)
         self.start_shortcut.activated.connect(self._submit_task)
@@ -839,6 +863,7 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event) -> None:
         """Handle window resize to adjust keyboard and finger UI"""
         super().resizeEvent(event)
+        self._update_background()
         QTimer.singleShot(10, self._adjust_adaptive_layout)  # Delay to ensure size is updated
     
     def _adjust_adaptive_layout(self) -> None:
@@ -1875,3 +1900,45 @@ class MainWindow(QMainWindow):
 
         self.task_display.setMinimumHeight(int(task_size * 2.2))
         self.input_box.setMinimumHeight(int(input_size * 2.2))
+    
+    def _update_background(self) -> None:
+        """Update the background SVG to fit the window size"""
+        if not self._background_label or not self._background_svg_renderer:
+            return
+        
+        # Get window size
+        size = self.size()
+        if size.width() <= 0 or size.height() <= 0:
+            return
+        
+        # Create pixmap at window size
+        pixmap = QPixmap(size.width(), size.height())
+        pixmap.fill(Qt.transparent)
+        
+        # Render SVG scaled to fit window (cover mode)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Calculate scale to cover the entire window
+        svg_size = self._background_svg_renderer.defaultSize()
+        if svg_size.width() > 0 and svg_size.height() > 0:
+            scale_x = size.width() / svg_size.width()
+            scale_y = size.height() / svg_size.height()
+            scale = max(scale_x, scale_y)  # Cover mode
+            
+            scaled_width = svg_size.width() * scale
+            scaled_height = svg_size.height() * scale
+            
+            # Center the scaled image
+            x = (size.width() - scaled_width) / 2
+            y = (size.height() - scaled_height) / 2
+            
+            painter.translate(x, y)
+            painter.scale(scale, scale)
+            self._background_svg_renderer.render(painter)
+        
+        painter.end()
+        
+        # Set pixmap to background label
+        self._background_label.setPixmap(pixmap)
+        self._background_label.setGeometry(0, 0, size.width(), size.height())
