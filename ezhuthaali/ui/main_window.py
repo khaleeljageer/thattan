@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
         self._bottom_container: Optional[QWidget] = None
         self._keyboard_font_sizes: dict[str, int] = {}  # Store current font sizes
         self._finger_guidance_label: Optional[QLabel] = None
+        self._key_base_style_by_label: dict[QLabel, str] = {}
         
         # Background SVG
         self._background_svg_path: Optional[Path] = None
@@ -278,7 +279,7 @@ class MainWindow(QMainWindow):
             'error': '#e53e3e',
             'error_bg': '#fed7d7',
             'success': '#38a169',
-            'success_bg': '#c6f6d5',
+            'success_bg': '#EB78D2',
             'progress': '#3182ce',
             'key_bg': '#edf2f7',
             'key_highlight': '#3182ce',
@@ -286,6 +287,42 @@ class MainWindow(QMainWindow):
             'key_shift': '#ed8936',
             'key_shift_bg': '#feebc8',
         }
+
+    def _get_finger_colors(self) -> dict[tuple[str, str], str]:
+        """Finger color palette (hand, finger) -> hex color."""
+        return {
+            ('left', 'pinky'): '#5C96EB',
+            ('left', 'ring'): '#EF6060',
+            ('left', 'middle'): '#2ECC71',
+            ('left', 'index'): '#7A5CEB',
+            ('left', 'thumb'): '#EB78D2',
+            ('right', 'pinky'): '#5C96EB',
+            ('right', 'ring'): '#EF6060',
+            ('right', 'middle'): '#2ECC71',
+            ('right', 'index'): '#FF953D',
+            ('right', 'thumb'): '#EB78D2',
+        }
+
+    def _finger_color_for_key(self, key_label: str) -> str:
+        """Return background color for a given key label."""
+        hand, finger = self._key_to_finger.get(key_label.upper(), ('right', 'index'))
+        return self._get_finger_colors().get((hand, finger), '#5C96EB')
+
+    def _build_key_style(self, key_label: str, font_px: int, *, border_px: int = 0, border_color: str = "#ffffff", font_weight: int = 500) -> str:
+        bg = self._finger_color_for_key(key_label)
+        border = f"{border_px}px solid {border_color}" if border_px > 0 else "none"
+        return f"""
+            QLabel {{
+                background: {bg};
+                color: #ffffff;
+                border: {border};
+                border-radius: 6px;
+                padding: 12px 8px;
+                font-family: '{self._marutham_font_family}', sans-serif;
+                font-size: {font_px}px;
+                font-weight: {font_weight};
+            }}
+        """
 
     def _calculate_keyboard_dimensions(self) -> tuple[float, int, int]:
         """Calculate keyboard aspect ratio and optimal size based on screen size.
@@ -470,7 +507,7 @@ class MainWindow(QMainWindow):
         """)
         left_panel.addWidget(self.level_status)
 
-        self.reset_button = QPushButton("🔄 முன்னேற்றத்தை மீட்டமை")
+        self.reset_button = QPushButton("↻ மீட்டமை")
         self.reset_button.setStyleSheet(f"""
             QPushButton {{
                 background: {colors['bg_container']};
@@ -958,37 +995,15 @@ class MainWindow(QMainWindow):
             # Update Space key
             if "Space" in self._key_labels:
                 space_label = self._key_labels["Space"]
-                key_style = f"""
-                    QLabel {{
-                        background: {colors['key_bg']};
-                        color: {colors['text_primary']};
-                        border: none;
-                        border-radius: 6px;
-                        padding: 12px 8px;
-                        font-family: '{self._marutham_font_family}', sans-serif;
-                        font-size: {special_font}px;
-                        font-weight: 400;
-                        color: {colors['text_muted']};
-                    }}
-                """
-                space_label.setStyleSheet(key_style)
+                style = self._build_key_style("Space", special_font, border_px=0, font_weight=500)
+                space_label.setStyleSheet(style)
+                self._key_base_style_by_label[space_label] = style
             
             # Update shift labels
             for shift_label in self._shift_labels:
-                key_style = f"""
-                    QLabel {{
-                        background: {colors['key_bg']};
-                        color: {colors['text_primary']};
-                        border: none;
-                        border-radius: 6px;
-                        padding: 12px 8px;
-                        font-family: '{self._marutham_font_family}', sans-serif;
-                        font-size: {special_font}px;
-                        font-weight: 400;
-                        color: {colors['text_muted']};
-                    }}
-                """
-                shift_label.setStyleSheet(key_style)
+                style = self._build_key_style("Shift", special_font, border_px=0, font_weight=500)
+                shift_label.setStyleSheet(style)
+                self._key_base_style_by_label[shift_label] = style
     
     def _on_key_press(self, event: QKeyEvent) -> bool:
         """Handle individual key press events"""
@@ -1278,7 +1293,7 @@ class MainWindow(QMainWindow):
         grid = QGridLayout(container)
         grid.setSpacing(8)
         # Set padding to match outer container padding for proper spacing
-        container.setStyleSheet("background: #ffffff; border-radius: 12px; padding: 0px;")
+        container.setStyleSheet("background: transparent; border-radius: 12px; padding: 0px;")
 
         colors = self._get_theme_colors()
         
@@ -1303,19 +1318,6 @@ class MainWindow(QMainWindow):
             'special': max(10, int(base_font_size * 0.78))
         }
         
-        key_style = f"""
-            QLabel {{
-                background: {colors['key_bg']};
-                color: {colors['text_primary']};
-                border: none;
-                border-radius: 6px;
-                padding: 12px 8px;
-                font-family: '{self._marutham_font_family}', sans-serif;
-                font-size: {base_font_size}px;
-                font-weight: 400;
-            }}
-        """
-
         size_map = {
             "Backspace": 2.0,
             "Tab": 1.75,
@@ -1385,38 +1387,42 @@ class MainWindow(QMainWindow):
                 
                 # Log each key size
                 logging.info(f"Key: {key}, Size: {size}, Width: {key_width}px, Height: {key_height}px")
-                
-                label.setStyleSheet(key_style)
+
                 label.setMinimumHeight(key_height)
                 # Don't set fixed minimum width - let grid handle it with stretch factors
                 # This allows keys to scale down when space is limited
                 label.setMinimumWidth(0)
-                colors = self._get_theme_colors()
+
                 if key in special_labels:
                     label.setText(html.escape(special_labels[key]))
-                    label.setStyleSheet(key_style + f"QLabel {{ font-family: '{self._marutham_font_family}', sans-serif; font-size: {special_font}px; color: {colors['text_muted']}; }}")
+                    style = self._build_key_style(key, special_font, border_px=0, font_weight=500)
+                    label.setStyleSheet(style)
+                    self._key_base_style_by_label[label] = style
                 else:
                     english = html.escape(key)
                     tamil_base = html.escape(display[0]) if display[0] else ""
                     tamil_shift = html.escape(display[1]) if display[1] else ""
+                    style = self._build_key_style(key, base_font_size, border_px=0, font_weight=500)
+                    label.setStyleSheet(style)
+                    self._key_base_style_by_label[label] = style
                     label.setText(
                         '<table width="100%" height="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">'
                             '<tr>'
                                 f'<td style="padding-right:3px; vertical-align:top; text-align:left; '
                                 f'font-family:\'{self._marutham_font_family}\', sans-serif; '
-                                f'font-size:{english_font}px; color:{colors["text_muted"]}; ">{english}</td>'
+                                f'font-size:{english_font}px; color:#ffffff; ">{english}</td>'
 
                                 '<td style="width:5px;"></td>'
 
                                 f'<td style="padding-left:3px; vertical-align:top; text-align:right; '
                                 f'font-family:\'{self._marutham_font_family}\', sans-serif; '
-                                f'font-size:{tamil_shift_font}px; color:{colors["text_muted"]}; ">{tamil_shift}</td>'
+                                f'font-size:{tamil_shift_font}px; color:#ffffff; ">{tamil_shift}</td>'
                             '</tr>'
 
                             '<tr>'
                                 f'<td colspan="3" style="vertical-align:bottom; text-align:left; '
                                 f'font-family:\'{self._marutham_font_family}\', sans-serif; '
-                                f'font-size:{tamil_base_font}px; font-weight:600; ">{tamil_base}</td>'
+                                f'font-size:{tamil_base_font}px; font-weight:600; color:#ffffff; ">{tamil_base}</td>'
                             '</tr>'
                         '</table>'
                     )
@@ -1476,65 +1482,30 @@ class MainWindow(QMainWindow):
                     '<tr>'
                         f'<td style="padding-right:3px; vertical-align:top; text-align:left; '
                         f'font-family:\'{self._marutham_font_family}\', sans-serif; '
-                        f'font-size:{english_font}px; color:{colors["text_muted"]}; ">{english}</td>'
+                        f'font-size:{english_font}px; color:#ffffff; ">{english}</td>'
                         '<td style="width:5px;"></td>'
                         f'<td style="padding-left:3px; vertical-align:top; text-align:right; '
                         f'font-family:\'{self._marutham_font_family}\', sans-serif; '
-                        f'font-size:{tamil_shift_font}px; color:{colors["text_muted"]}; ">{tamil_shift}</td>'
+                        f'font-size:{tamil_shift_font}px; color:#ffffff; ">{tamil_shift}</td>'
                     '</tr>'
                     '<tr>'
                         f'<td colspan="3" style="vertical-align:bottom; text-align:left; '
                         f'font-family:\'{self._marutham_font_family}\', sans-serif; '
-                        f'font-size:{tamil_base_font}px; font-weight:600; ">{tamil_base}</td>'
+                        f'font-size:{tamil_base_font}px; font-weight:600; color:#ffffff; ">{tamil_base}</td>'
                     '</tr>'
                 '</table>'
             )
 
     def _clear_keyboard_highlight(self) -> None:
-        colors = self._get_theme_colors()
         for label in self._highlighted_keys:
-            label.setStyleSheet(f"""
-                QLabel {{
-                    background: {colors['key_bg']};
-                    color: {colors['text_primary']};
-                    border: none;
-                    border-radius: 6px;
-                    padding: 12px 8px;
-                    font-family: '{self._marutham_font_family}', sans-serif;
-                    font-size: 18px;
-                    font-weight: 400;
-                }}
-            """)
+            base_style = self._key_base_style_by_label.get(label)
+            if base_style:
+                label.setStyleSheet(base_style)
         self._highlighted_keys = []
 
     def _highlight_key(self, label: QLabel, key_label: str = "", is_shift: bool = False) -> None:
-        colors = self._get_theme_colors()
-        if is_shift:
-            style = f"""
-                QLabel {{
-                    background: {colors['key_shift_bg']};
-                    color: {colors['text_primary']};
-                    border: 2px solid {colors['key_shift']};
-                    border-radius: 6px;
-                    padding: 12px 8px;
-                    font-family: '{self._marutham_font_family}', sans-serif;
-                    font-size: 18px;
-                    font-weight: 500;
-                }}
-            """
-        else:
-            style = f"""
-                QLabel {{
-                    background: {colors['key_highlight_bg']};
-                    color: {colors['text_primary']};
-                    border: 2px solid {colors['key_highlight']};
-                    border-radius: 6px;
-                    padding: 12px 8px;
-                    font-family: '{self._marutham_font_family}', sans-serif;
-                    font-size: 18px;
-                    font-weight: 500;
-                }}
-            """
+        font_px = self._keyboard_font_sizes.get('special', 18) if (is_shift or key_label in {"Shift", "Space", "Backspace", "Tab", "Caps", "Enter", "Ctrl", "Alt"}) else self._keyboard_font_sizes.get('base', 18)
+        style = self._build_key_style(key_label or "Shift", font_px, border_px=4, border_color="#000000", font_weight=800)
         label.setStyleSheet(style)
         self._highlighted_keys.append(label)
 
@@ -1575,16 +1546,17 @@ class MainWindow(QMainWindow):
             if "Space" in self._key_labels:
                 space_label = self._key_labels["Space"]
                 colors = self._get_theme_colors()
+                font_px = self._keyboard_font_sizes.get('special', 18)
                 space_label.setStyleSheet(f"""
                     QLabel {{
                         background: {colors['success_bg']};
-                        color: {colors['text_primary']};
-                        border: 2px solid {colors['success']};
+                        color: #ffffff;
+                        border: 4px solid #000000;
                         border-radius: 6px;
                         padding: 12px 8px;
                         font-family: '{self._marutham_font_family}', sans-serif;
-                        font-size: 18px;
-                        font-weight: 500;
+                        font-size: {font_px}px;
+                        font-weight: 800;
                     }}
                 """)
                 self._highlighted_keys.append(space_label)
