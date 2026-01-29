@@ -345,7 +345,6 @@ class MainWindow(QMainWindow):
     def _highlight_border_color_for_key(self, key_label: str) -> str:
         """Border color for highlight that matches the finger palette (darker shade)."""
         base = self._finger_color_for_key(key_label)
-        # Dark enough to pop on the filled key, but still in the same hue family.
         return self._darken_hex_color(base, 0.45)
 
     def _build_key_style(
