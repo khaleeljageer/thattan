@@ -23,8 +23,8 @@ def load_application_font(app: QApplication) -> None:
     font_path = Path(__file__).parent / "assets" / "TAU-Marutham.ttf"
     
     if not font_path.exists():
-        # Fallback: try to find it in the original location
-        font_path = Path("/home/zs-khaleel/Downloads/tau_fonts/TAU-Marutham.ttf")
+        logging.warning(f"Font file not found: {font_path}")
+        return
     
     if font_path.exists():
         # Load the font

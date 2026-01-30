@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt, QTimer, QObject, QSize, QPropertyAnimation
 from PySide6.QtGui import QFont, QShortcut, QKeyEvent, QPixmap, QGuiApplication, QFontDatabase, QPainter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
+    QApplication,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -141,30 +142,10 @@ class MainWindow(QMainWindow):
         # Finger mapping for QWERTY/Tamil99 layout
         self._key_to_finger = self._build_finger_mapping()
 
-        # Load Marutham font from assets
-        self._load_marutham_font()
-
         self._build_ui()
         self._refresh_levels_list()
         QTimer.singleShot(0, self.showMaximized)
 
-    def _load_marutham_font(self) -> None:
-        """Load Marutham font from assets"""
-        font_path = Path(__file__).parent.parent / "assets" / "TAU-Marutham.ttf"
-        if font_path.exists():
-            font_id = QFontDatabase.addApplicationFont(str(font_path))
-            if font_id != -1:
-                font_families = QFontDatabase.applicationFontFamilies(font_id)
-                if font_families:
-                    self._marutham_font_family = font_families[0]
-                    logging.info(f"Loaded Marutham font: {self._marutham_font_family}")
-                else:
-                    self._marutham_font_family = "TAU-Marutham"
-            else:
-                self._marutham_font_family = "TAU-Marutham"
-        else:
-            self._marutham_font_family = "TAU-Marutham"
-            logging.warning(f"Marutham font not found at {font_path}")
     
     def _build_finger_mapping(self) -> dict[str, tuple[str, str]]:
         """Build mapping from key to (hand, finger) tuple.
@@ -365,7 +346,7 @@ class MainWindow(QMainWindow):
                 border: {border};
                 border-radius: 6px;
                 padding: 12px 8px;
-                font-family: '{self._marutham_font_family}', sans-serif;
+                font-family: '{QApplication.font().family()}', sans-serif;
                 font-size: {font_px}px;
                 font-weight: {font_weight};
             }}
@@ -615,7 +596,7 @@ class MainWindow(QMainWindow):
             padding: 24px 28px;
             font-size: 26px;
             font-weight: 400;
-            font-family: '{self._marutham_font_family}', sans-serif;
+            font-family: '{QApplication.font().family()}', sans-serif;
             min-height: 100px;
         """)
         self.task_display.setMinimumHeight(100)
@@ -646,7 +627,7 @@ class MainWindow(QMainWindow):
                 padding: 24px 28px;
                 font-size: 26px;
                 font-weight: 400;
-                font-family: '{self._marutham_font_family}', sans-serif;
+                font-family: '{QApplication.font().family()}', sans-serif;
             }}
             QLineEdit:focus {{
                 border: 2px solid {colors['highlight']};
@@ -729,7 +710,7 @@ class MainWindow(QMainWindow):
                 padding: 12px 16px;
                 font-size: 16px;
                 font-weight: 600;
-                font-family: '{self._marutham_font_family}', sans-serif;
+                font-family: '{QApplication.font().family()}', sans-serif;
                 min-height: 50px;
             }}
         """)
@@ -1506,19 +1487,19 @@ class MainWindow(QMainWindow):
                         '<table width="100%" height="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">'
                             '<tr>'
                                 f'<td style="padding-right:3px; vertical-align:top; text-align:left; '
-                                f'font-family:\'{self._marutham_font_family}\', sans-serif; '
+                                f'font-family:\'{QApplication.font().family()}\', sans-serif; '
                                 f'font-size:{english_font}px; color:#ffffff; ">{english}</td>'
 
                                 '<td style="width:5px;"></td>'
 
                                 f'<td style="padding-left:3px; vertical-align:top; text-align:right; '
-                                f'font-family:\'{self._marutham_font_family}\', sans-serif; '
+                                f'font-family:\'{QApplication.font().family()}\', sans-serif; '
                                 f'font-size:{tamil_shift_font}px; color:#ffffff; ">{tamil_shift}</td>'
                             '</tr>'
 
                             '<tr>'
                                 f'<td colspan="3" style="vertical-align:bottom; text-align:left; '
-                                f'font-family:\'{self._marutham_font_family}\', sans-serif; '
+                                f'font-family:\'{QApplication.font().family()}\', sans-serif; '
                                 f'font-size:{tamil_base_font}px; font-weight:600; color:#ffffff; ">{tamil_base}</td>'
                             '</tr>'
                         '</table>'
@@ -1583,16 +1564,16 @@ class MainWindow(QMainWindow):
                 '<table width="100%" height="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">'
                     '<tr>'
                         f'<td style="padding-right:3px; vertical-align:top; text-align:left; '
-                        f'font-family:\'{self._marutham_font_family}\', sans-serif; '
+                        f'font-family:\'{QApplication.font().family()}\', sans-serif; '
                         f'font-size:{english_font}px; color:#ffffff; ">{english}</td>'
                         '<td style="width:5px;"></td>'
                         f'<td style="padding-left:3px; vertical-align:top; text-align:right; '
-                        f'font-family:\'{self._marutham_font_family}\', sans-serif; '
+                        f'font-family:\'{QApplication.font().family()}\', sans-serif; '
                         f'font-size:{tamil_shift_font}px; color:#ffffff; ">{tamil_shift}</td>'
                     '</tr>'
                     '<tr>'
                         f'<td colspan="3" style="vertical-align:bottom; text-align:left; '
-                        f'font-family:\'{self._marutham_font_family}\', sans-serif; '
+                        f'font-family:\'{QApplication.font().family()}\', sans-serif; '
                         f'font-size:{tamil_base_font}px; font-weight:600; color:#ffffff; ">{tamil_base}</td>'
                     '</tr>'
                 '</table>'
@@ -1667,7 +1648,7 @@ class MainWindow(QMainWindow):
                         border: 4px solid {border_color};
                         border-radius: 6px;
                         padding: 12px 8px;
-                        font-family: '{self._marutham_font_family}', sans-serif;
+                        font-family: '{QApplication.font().family()}', sans-serif;
                         font-size: {font_px}px;
                         font-weight: 500;
                     }}
@@ -1768,7 +1749,7 @@ class MainWindow(QMainWindow):
         return char.upper(), False
 
     def _load_tamil99_maps(self) -> tuple[dict[str, tuple[str, Optional[str]]], dict[str, str]]:
-        mapping_path = Path("/usr/share/m17n/ta-tamil99.mim")
+        mapping_path = Path(__file__).parent.parent / "data" / "m17n" / "ta-tamil99.mim"
         if not mapping_path.exists():
             return {}, {}
 
@@ -1946,7 +1927,7 @@ class MainWindow(QMainWindow):
                     padding: 24px 28px;
                     font-size: 26px;
                     font-weight: 400;
-                    font-family: '{self._marutham_font_family}', sans-serif;
+                    font-family: '{QApplication.font().family()}', sans-serif;
                 }}
             """)
         else:
@@ -1959,7 +1940,7 @@ class MainWindow(QMainWindow):
                     padding: 24px 28px;
                     font-size: 26px;
                     font-weight: 400;
-                    font-family: '{self._marutham_font_family}', sans-serif;
+                    font-family: '{QApplication.font().family()}', sans-serif;
                 }}
                 QLineEdit:focus {{
                     border: 2px solid {colors['highlight']};
@@ -1975,11 +1956,11 @@ class MainWindow(QMainWindow):
         task_size = max(16.0, height * 0.035)
         input_size = max(15.0, height * 0.03)
 
-        task_font = QFont(self._marutham_font_family)
+        task_font = QFont(QApplication.font().family())
         task_font.setPointSizeF(task_size)
         self.task_display.setFont(task_font)
 
-        input_font = QFont(self._marutham_font_family)
+        input_font = QFont(QApplication.font().family())
         input_font.setPointSizeF(input_size)
         self.input_box.setFont(input_font)
 
