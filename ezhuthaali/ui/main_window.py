@@ -132,6 +132,8 @@ class MainWindow(QMainWindow):
         self._background_svg_path: Optional[Path] = None
         self._background_svg_renderer: Optional[QSvgRenderer] = None
         self._background_label: Optional[QLabel] = None
+        self._background_update_timer: Optional[QTimer] = None
+        self._background_last_render_key: Optional[tuple[int, int, float]] = None
 
         # Invalid input overlay (red flash)
         self._error_overlay: Optional[QWidget] = None
@@ -446,6 +448,14 @@ class MainWindow(QMainWindow):
             self._background_label.setAlignment(Qt.AlignCenter)
             self._background_label.lower()  # Put it behind everything
             self._background_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)  # Allow clicks to pass through
+            # During interactive resize, allow cheap scaling of last pixmap;
+            # a debounced re-render will refresh it crisply.
+            self._background_label.setScaledContents(True)
+
+            # Debounce expensive SVG->pixmap renders on resize
+            self._background_update_timer = QTimer(self)
+            self._background_update_timer.setSingleShot(True)
+            self._background_update_timer.timeout.connect(self._update_background)
 
         # Create invalid input overlay (as child of main window to cover entire window)
         self._error_overlay = QWidget(self)
@@ -978,7 +988,7 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event) -> None:
         """Handle window resize to adjust keyboard and finger UI"""
         super().resizeEvent(event)
-        self._update_background()
+        self._schedule_background_update()
         self._update_error_overlay_geometry()
         QTimer.singleShot(10, self._adjust_adaptive_layout)  # Delay to ensure size is updated
     
@@ -2004,9 +2014,16 @@ class MainWindow(QMainWindow):
         size = self.size()
         if size.width() <= 0 or size.height() <= 0:
             return
+
+        dpr = float(self.devicePixelRatioF())
+        render_key = (size.width(), size.height(), dpr)
+        if self._background_last_render_key == render_key:
+            # Avoid redundant renders while resizing
+            return
         
-        # Create pixmap at window size
-        pixmap = QPixmap(size.width(), size.height())
+        # Create pixmap at window size (device pixels for crisp rendering)
+        pixmap = QPixmap(int(size.width() * dpr), int(size.height() * dpr))
+        pixmap.setDevicePixelRatio(dpr)
         pixmap.fill(Qt.transparent)
         
         # Render SVG scaled to match window size exactly
@@ -2028,3 +2045,15 @@ class MainWindow(QMainWindow):
         # Set pixmap to background label
         self._background_label.setPixmap(pixmap)
         self._background_label.setGeometry(0, 0, size.width(), size.height())
+        self._background_last_render_key = render_key
+
+    def _schedule_background_update(self, debounce_ms: int = 50) -> None:
+        """Debounce background renders during interactive resize."""
+        if not self._background_label or not self._background_svg_renderer:
+            return
+        if self._background_update_timer is None:
+            self._update_background()
+            return
+        # Restart timer (cancels previous pending update)
+        self._background_update_timer.stop()
+        self._background_update_timer.start(max(0, int(debounce_ms)))
