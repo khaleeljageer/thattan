@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QGraphicsOpacityEffect,
     QSizePolicy,
+    QStackedWidget,
     QStyle,
     QVBoxLayout,
     QWidget,
@@ -127,6 +128,13 @@ class MainWindow(QMainWindow):
         self._keyboard_font_sizes: dict[str, int] = {}  # Store current font sizes
         self._finger_guidance_label: Optional[QLabel] = None
         self._key_base_style_by_label: dict[QLabel, str] = {}
+
+        # Multi-screen navigation
+        self._stack: Optional[QStackedWidget] = None
+        self._home_screen: Optional[QWidget] = None
+        self._typing_screen: Optional[QWidget] = None
+        self._back_button: Optional[QPushButton] = None
+        self._typing_title_label: Optional[QLabel] = None
         
         # Background SVG
         self._background_svg_path: Optional[Path] = None
@@ -439,9 +447,7 @@ class MainWindow(QMainWindow):
         if background_svg_path.exists():
             self._background_svg_path = background_svg_path
             self._background_svg_renderer = QSvgRenderer(str(background_svg_path))
-        
-        root = QWidget()
-        
+
         # Create background label for SVG (as child of main window to cover entire window)
         if self._background_svg_renderer:
             self._background_label = QLabel(self)
@@ -472,23 +478,34 @@ class MainWindow(QMainWindow):
         self._error_overlay_anim.setKeyValueAt(0.2, 0.28)
         self._error_overlay_anim.setKeyValueAt(1.0, 0.0)
         self._error_overlay_anim.finished.connect(self._error_overlay.hide)
-        
-        layout = QVBoxLayout(root)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
 
-        left_panel = QVBoxLayout()
-        left_panel.setSpacing(15)
-        
+        # ---- Multi-screen container ----
+        self._stack = QStackedWidget()
+        self._home_screen = QWidget()
+        self._typing_screen = QWidget()
+        self._stack.addWidget(self._home_screen)
+        self._stack.addWidget(self._typing_screen)
+        self.setCentralWidget(self._stack)
+
+        # ---- Home screen: Stats + Levels ----
+        home_layout = QHBoxLayout(self._home_screen)
+        home_layout.setContentsMargins(24, 24, 24, 24)
+        home_layout.setSpacing(20)
+
+        stats_col_widget = QWidget()
+        stats_col = QVBoxLayout(stats_col_widget)
+        stats_col.setSpacing(15)
+        stats_col.setContentsMargins(0, 0, 0, 0)
+
         stats_header = QLabel("📊 முன்னேற்றம்")
         stats_header.setStyleSheet(f"""
-            font-size: 15px; 
-            font-weight: 600; 
-            color: {colors['text_secondary']}; 
+            font-size: 15px;
+            font-weight: 600;
+            color: {colors['text_secondary']};
             padding: 8px 0px;
         """)
-        left_panel.addWidget(stats_header)
-        
+        stats_col.addWidget(stats_header)
+
         stats_container = QWidget()
         stats_container.setStyleSheet(f"""
             QWidget {{
@@ -500,7 +517,7 @@ class MainWindow(QMainWindow):
         """)
         stats_layout = QVBoxLayout(stats_container)
         stats_layout.setSpacing(12)
-        
+
         self.score_label = QLabel("புள்ளிகள்: 0")
         self.score_label.setStyleSheet(f"""
             background: {colors['bg_card']};
@@ -512,7 +529,7 @@ class MainWindow(QMainWindow):
             border-left: 3px solid {colors['text_muted']};
         """)
         stats_layout.addWidget(self.score_label)
-        
+
         self.streak_label = QLabel("தொடர்ச்சி: 0")
         self.streak_label.setStyleSheet(f"""
             background: {colors['bg_card']};
@@ -524,7 +541,7 @@ class MainWindow(QMainWindow):
             border-left: 3px solid {colors['success']};
         """)
         stats_layout.addWidget(self.streak_label)
-        
+
         self.best_streak_label = QLabel("சிறந்த தொடர்ச்சி: 0")
         self.best_streak_label.setStyleSheet(f"""
             background: {colors['bg_card']};
@@ -536,18 +553,46 @@ class MainWindow(QMainWindow):
             border-left: 3px solid {colors['highlight']};
         """)
         stats_layout.addWidget(self.best_streak_label)
-        
-        left_panel.addWidget(stats_container)
-        
+
+        stats_col.addWidget(stats_container)
+
+        self.reset_button = QPushButton("↻ மீட்டமை")
+        self.reset_button.setStyleSheet(f"""
+            QPushButton {{
+                background: {colors['bg_container']};
+                color: {colors['text_muted']};
+                padding: 10px 16px;
+                border: none;
+                border-radius: 8px;
+                font-weight: 500;
+                font-size: 13px;
+            }}
+            QPushButton:hover {{
+                background: {colors['bg_hover']};
+                color: {colors['text_secondary']};
+            }}
+            QPushButton:pressed {{
+                background: {colors['bg_card']};
+            }}
+        """)
+        self.reset_button.clicked.connect(self._reset_progress)
+        stats_col.addWidget(self.reset_button)
+        stats_col.addStretch(1)
+
+        levels_col_widget = QWidget()
+        levels_col = QVBoxLayout(levels_col_widget)
+        levels_col.setSpacing(15)
+        levels_col.setContentsMargins(0, 0, 0, 0)
+
         level_header = QLabel("📚 நிலைகள்")
         level_header.setStyleSheet(f"""
-            font-size: 16px; 
-            font-weight: 600; 
-            color: {colors['text_secondary']}; 
+            font-size: 16px;
+            font-weight: 600;
+            color: {colors['text_secondary']};
             padding: 12px 0px;
         """)
-        left_panel.addWidget(level_header)
-        
+        levels_col.addWidget(level_header)
+
         self.levels_list = QListWidget()
         self.levels_list.setStyleSheet(f"""
             QListWidget {{
@@ -579,7 +624,7 @@ class MainWindow(QMainWindow):
             }}
         """)
         self.levels_list.itemSelectionChanged.connect(self._on_level_selected)
-        left_panel.addWidget(self.levels_list)
+        levels_col.addWidget(self.levels_list, 1)
 
         self.level_status = QLabel("தொடங்க ஒரு நிலையைத் தேர்வு செய்யவும்.")
         self.level_status.setWordWrap(True)
@@ -592,33 +637,47 @@ class MainWindow(QMainWindow):
             font-weight: 500;
             border: none;
         """)
-        left_panel.addWidget(self.level_status)
+        levels_col.addWidget(self.level_status)
 
-        self.reset_button = QPushButton("↻ மீட்டமை")
-        self.reset_button.setStyleSheet(f"""
+        home_layout.addWidget(stats_col_widget, 1)
+        home_layout.addWidget(levels_col_widget, 2)
+
+        # ---- Typing screen ----
+        typing_layout = QVBoxLayout(self._typing_screen)
+        typing_layout.setContentsMargins(24, 24, 24, 24)
+        typing_layout.setSpacing(20)
+
+        typing_top = QHBoxLayout()
+        typing_top.setSpacing(12)
+        self._back_button = QPushButton("← நிலைகள்")
+        self._back_button.setStyleSheet(f"""
             QPushButton {{
                 background: {colors['bg_container']};
-                color: {colors['text_muted']};
-                padding: 10px 16px;
+                color: {colors['text_secondary']};
+                padding: 10px 14px;
                 border: none;
-                border-radius: 8px;
-                font-weight: 500;
+                border-radius: 10px;
+                font-weight: 600;
                 font-size: 13px;
             }}
             QPushButton:hover {{
                 background: {colors['bg_hover']};
-                color: {colors['text_secondary']};
-            }}
-            QPushButton:pressed {{
-                background: {colors['bg_card']};
             }}
         """)
-        self.reset_button.clicked.connect(self._reset_progress)
-        left_panel.addWidget(self.reset_button)
-        left_panel.addStretch(1)
+        self._back_button.clicked.connect(self._show_home_screen)
+        typing_top.addWidget(self._back_button, 0)
 
-        right_panel = QVBoxLayout()
-        
+        self._typing_title_label = QLabel("")
+        self._typing_title_label.setStyleSheet(f"""
+            color: {colors['text_secondary']};
+            font-size: 14px;
+            font-weight: 600;
+            padding: 0px 4px;
+        """)
+        typing_top.addWidget(self._typing_title_label, 0)
+        typing_top.addStretch(1)
+        typing_layout.addLayout(typing_top)
+
         task_container = QWidget()
         task_container.setStyleSheet(f"""
             QWidget {{
@@ -631,7 +690,7 @@ class MainWindow(QMainWindow):
         task_container_layout = QVBoxLayout(task_container)
         task_container_layout.setContentsMargins(0, 0, 0, 0)
         task_container_layout.setSpacing(12)
-        
+
         self.combo_label = QLabel("")
         self.combo_label.setVisible(False)
 
@@ -651,7 +710,7 @@ class MainWindow(QMainWindow):
         """)
         self.task_display.setMinimumHeight(100)
         task_container_layout.addWidget(self.task_display)
-        right_panel.addWidget(task_container)
+        typing_layout.addWidget(task_container)
 
         input_container = QWidget()
         input_container.setStyleSheet(f"""
@@ -665,7 +724,7 @@ class MainWindow(QMainWindow):
         input_container_layout = QVBoxLayout(input_container)
         input_container_layout.setContentsMargins(0, 0, 0, 0)
         input_container_layout.setSpacing(12)
-        
+
         self.input_box = QLineEdit()
         self.input_box.setMinimumHeight(100)
         self.input_box.setStyleSheet(f"""
@@ -687,7 +746,7 @@ class MainWindow(QMainWindow):
         self.input_box.installEventFilter(self)
         self.input_box.setReadOnly(True)  # Prevent text input, we'll handle keys manually
         input_container_layout.addWidget(self.input_box)
-        right_panel.addWidget(input_container)
+        typing_layout.addWidget(input_container)
 
         progress_container = QWidget()
         progress_container.setStyleSheet(f"""
@@ -700,7 +759,7 @@ class MainWindow(QMainWindow):
         """)
         progress_layout = QVBoxLayout(progress_container)
         progress_layout.setSpacing(10)
-        
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setStyleSheet(f"""
@@ -720,16 +779,9 @@ class MainWindow(QMainWindow):
             }}
         """)
         progress_layout.addWidget(self.progress_bar)
-        right_panel.addWidget(progress_container)
-        right_panel.addStretch(1)
+        typing_layout.addWidget(progress_container)
 
-        top_row = QHBoxLayout()
-        top_row.setSpacing(20)
-        top_row.addLayout(left_panel, 1)
-        top_row.addLayout(right_panel, 3)
-        layout.addLayout(top_row)
-
-        # Single parent container for Finger UI and Keyboard
+        # Single parent container for Finger UI and Keyboard (typing screen only)
         self._bottom_container = QWidget()
         self._bottom_container.setStyleSheet(f"""
             background: transparent;
@@ -737,17 +789,15 @@ class MainWindow(QMainWindow):
             padding: 20px;
         """)
         bottom_row = QHBoxLayout(self._bottom_container)
-        bottom_row.setSpacing(15)  # Small spacing between finger UI and keyboard
+        bottom_row.setSpacing(15)
         bottom_row.setContentsMargins(0, 0, 0, 0)
-        
-        # Finger UI container on the left
+
         finger_ui_container = QWidget()
         finger_ui_layout = QVBoxLayout(finger_ui_container)
         finger_ui_layout.setSpacing(10)
         finger_ui_layout.setContentsMargins(0, 0, 0, 0)
-        finger_ui_layout.setAlignment(Qt.AlignCenter)  # Center all contents
-        
-        # Finger guidance label
+        finger_ui_layout.setAlignment(Qt.AlignCenter)
+
         self._finger_guidance_label = QLabel("")
         self._finger_guidance_label.setAlignment(Qt.AlignCenter)
         self._finger_guidance_label.setWordWrap(True)
@@ -764,53 +814,41 @@ class MainWindow(QMainWindow):
                 min-height: 50px;
             }}
         """)
-        self._finger_guidance_label.setVisible(False)  # Hidden until session starts
+        self._finger_guidance_label.setVisible(False)
         finger_ui_layout.addWidget(self._finger_guidance_label, 0, Qt.AlignCenter)
-        
-        # Hands image - centered to match text layout
+
         hands_image_path = Path(__file__).parent.parent / "assets" / "hands.png"
         if hands_image_path.exists():
             self._hands_image_label = QLabel()
             self._original_hands_pixmap = QPixmap(str(hands_image_path))
-            
-            # Initial scale - will be adjusted on resize
+
             initial_max_width = 600
             pixmap = self._original_hands_pixmap
             if pixmap.width() > initial_max_width:
                 pixmap = pixmap.scaledToWidth(initial_max_width, Qt.SmoothTransformation)
-            
+
             self._hands_image_label.setPixmap(pixmap)
             self._hands_image_label.setAlignment(Qt.AlignCenter)
-            # Remove background - parent container provides it
             self._hands_image_label.setStyleSheet("background: transparent; padding: 0px;")
-            # Use flexible size policy to allow shrinking
             self._hands_image_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-            self._hands_image_label.setMinimumWidth(200)  # Minimum to prevent too small
-            self._hands_image_label.setMinimumHeight(100)  # Minimum height
-            # Center the hands image to align with the text layout above
+            self._hands_image_label.setMinimumWidth(200)
+            self._hands_image_label.setMinimumHeight(100)
             finger_ui_layout.addWidget(self._hands_image_label, 0, Qt.AlignCenter)
-        
-        bottom_row.addWidget(finger_ui_container, 1)  # Stretch factor 1
-        
-        # Keyboard on the right
+
+        bottom_row.addWidget(finger_ui_container, 1)
+
         self._keyboard_widget = self._build_keyboard()
-        
-        # Remove background - parent container provides it
         self._keyboard_widget.setStyleSheet("background: transparent; border: none; padding: 0px;")
-        
-        # Use flexible size policy - allow shrinking below minimum if needed
         self._keyboard_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        # Set a very small minimum to allow maximum flexibility
         self._keyboard_widget.setMinimumSize(400, 150)
-        bottom_row.addWidget(self._keyboard_widget, 2)  # Stretch factor 2 (keyboard gets more space)
-        
-        layout.addWidget(self._bottom_container)
-        
-        # Connect resize event to adjust layout dynamically
+        bottom_row.addWidget(self._keyboard_widget, 2)
+
+        typing_layout.addWidget(self._bottom_container)
         self._bottom_container.installEventFilter(self)
-        
-        self.setCentralWidget(root)
-        
+
+        # Start on home screen
+        self._stack.setCurrentWidget(self._home_screen)
+
         # Update background after window is set up
         self._update_background()
         self._update_error_overlay_geometry()
@@ -840,8 +878,8 @@ class MainWindow(QMainWindow):
                 item.setIcon(self.style().standardIcon(QStyle.SP_MessageBoxWarning))
             self.levels_list.addItem(item)
 
-        if level_states:
-            self.levels_list.setCurrentRow(0)
+        # Do not auto-select a level here; keep the app on the home screen until
+        # the user explicitly picks a level.
 
     def _build_level_states(self) -> list[LevelState]:
         levels = self._levels_repo.all()
@@ -876,6 +914,26 @@ class MainWindow(QMainWindow):
         if progress.completed >= task_count:
             pass
         self._start_session(level, progress.completed)
+        if self._typing_title_label is not None:
+            self._typing_title_label.setText(level.name)
+        self._show_typing_screen()
+
+    def _show_home_screen(self) -> None:
+        if self._stack is None or self._home_screen is None:
+            return
+        self._stack.setCurrentWidget(self._home_screen)
+        if self._finger_guidance_label is not None:
+            self._finger_guidance_label.setVisible(False)
+        self._clear_keyboard_highlight()
+        if hasattr(self, "levels_list") and self.levels_list is not None:
+            self.levels_list.setFocus()
+
+    def _show_typing_screen(self) -> None:
+        if self._stack is None or self._typing_screen is None:
+            return
+        self._stack.setCurrentWidget(self._typing_screen)
+        if hasattr(self, "input_box") and self.input_box is not None:
+            self.input_box.setFocus()
 
     def _start_session(self, level: Level, start_index: int) -> None:
         task_count = len(level.tasks)
