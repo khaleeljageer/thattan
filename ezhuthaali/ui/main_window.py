@@ -1656,9 +1656,9 @@ class MainWindow(QMainWindow):
 
         # Left panel: stats (Time, WPM, Accuracy, Streak, Correct/Incorrect)
         stats_panel = QWidget()
-        stats_panel.setFixedWidth(260)
+        stats_panel.setFixedWidth(280)
         stats_layout = QVBoxLayout(stats_panel)
-        stats_layout.setContentsMargins(0, 0, 0, 0)
+        stats_layout.setContentsMargins(10, 0, 10, 10)
         stats_layout.setSpacing(14)
 
         time_card = GlassCard()
