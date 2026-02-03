@@ -268,7 +268,7 @@ class HomeProgressBar(QWidget):
                 painter.setBrush(Qt.NoBrush)
                 font = painter.font()
                 font.setPointSize(max(9, self.height() - 4))
-                font.setWeight(600)
+                font.setWeight(QFont.Weight.DemiBold)
                 painter.setFont(font)
                 painter.setPen(QColor("#ffffff"))
                 text = f"{pct}%"
