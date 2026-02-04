@@ -140,3 +140,4 @@ dmypy.json
 *.pyd
 
 test.py
+tamil_typing_adaptive.py
