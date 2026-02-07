@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-from PySide6.QtCore import Qt, QDateTime, QPoint, QPointF, QTimer, QSize, QPropertyAnimation, QRectF, Signal, QEventLoop, QEvent, QUrl
+from PySide6.QtCore import Qt, QDateTime, QPoint, QPointF, QTimer, QSize, QPropertyAnimation, QRectF, QEventLoop
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -28,16 +28,12 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
-    QDialog,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QFrame,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
-    QMessageBox,
     QPushButton,
     QProgressBar,
     QGraphicsOpacityEffect,
@@ -54,6 +50,7 @@ from ezhuthaali.core.progress import ProgressStore
 from ezhuthaali.core.session import TypingSession, TaskResult
 from ezhuthaali.core.keystroke_tracker import KeystrokeTracker, Tamil99KeyboardLayout
 from ezhuthaali.ui.about_overlay import AboutOverlay
+from ezhuthaali.ui.custom_overlay import ResetConfirmOverlay, LevelCompletedOverlay
 
 
 @dataclass
@@ -1461,6 +1458,10 @@ class MainWindow(QMainWindow):
 
         self._about_overlay = AboutOverlay(self._stack)
         self._about_overlay.hide()
+        self._reset_overlay = ResetConfirmOverlay(self._stack)
+        self._reset_overlay.hide()
+        self._level_completed_overlay = LevelCompletedOverlay(self._stack)
+        self._level_completed_overlay.hide()
 
         # ---- Home screen: Light theme glass UI (like `test.py`) ----
         home_layout = QVBoxLayout(self._home_screen)
@@ -2103,15 +2104,6 @@ class MainWindow(QMainWindow):
                 self._typing_feedback_label.setText("இந்த எழுத்தை தட்டச்சு செய்க")
         self._show_typing_screen()
 
-    def _on_level_selected(self) -> None:
-        if not (hasattr(self, "levels_list") and getattr(self, "levels_list") is not None):
-            return
-        items = self.levels_list.selectedItems()
-        if not items:
-            return
-        level_key = items[0].data(Qt.UserRole)
-        self._start_level(level_key)
-
     def _show_home_screen(self) -> None:
         if self._stack is None or self._home_screen is None:
             return
@@ -2588,9 +2580,9 @@ class MainWindow(QMainWindow):
     
     def _submit_task_from_keystrokes(self) -> None:
         """Submit task when all keystrokes are completed"""
-        if not self._session:
+        if not self._session or self._session.is_complete():
             return
-        
+
         typed = self._typed_tamil_text if self._typed_tamil_text else self._current_task_text
         self._submit_task(typed)
         
@@ -2601,15 +2593,13 @@ class MainWindow(QMainWindow):
     
     def _update_stats_from_tracker(self) -> None:
         """Update UI stats from keystroke tracker"""
-        summary = self._keystroke_tracker.get_session_summary()
+        self._keystroke_tracker.get_session_summary()
         self._update_gamification_stats()
-    
-    def _on_input_changed(self, text: str) -> None:
-        """Legacy method - no longer used but kept for compatibility"""
-        pass
 
     def _submit_task(self, typed: Optional[str] = None) -> None:
         if not self._session or not self._current_level:
+            return
+        if self._session.is_complete():
             return
         if typed is None:
             typed = self.input_box.text()
@@ -2708,19 +2698,38 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(idx)
 
     def _level_completed(self) -> None:
+        if self._typing_stats_timer is not None:
+            self._typing_stats_timer.stop()
         self.task_display.setText("நிலை முடிந்தது! அடுத்த நிலையைத் தேர்வு செய்யவும்.")
         self._set_input_text("")
-        QMessageBox.information(self, "நிலை முடிந்தது", "இந்த நிலையை நீங்கள் முடித்துவிட்டீர்கள்!")
+        overlay = self._level_completed_overlay
+        overlay.setGeometry(self._stack.rect())
+        overlay.raise_()
+        overlay.show()
+        loop = QEventLoop()
+        overlay.closed.connect(loop.quit)
+        loop.exec()
+        overlay.closed.disconnect(loop.quit)
         self._refresh_levels_list()
         self._clear_keyboard_highlight()
 
     def _reset_progress(self) -> None:
-        confirm = QMessageBox.question(
-            self,
-            "முன்னேற்றத்தை மீட்டமை",
-            "அனைத்து முன்னேற்றத்தையும் மீட்டமைக்க வேண்டுமா?",
-        )
-        if confirm == QMessageBox.Yes:
+        overlay = self._reset_overlay
+        overlay.setGeometry(self._stack.rect())
+        overlay.raise_()
+        overlay.show()
+        confirmed = [False]
+
+        def on_closed(ok: bool) -> None:
+            confirmed[0] = ok
+            loop.quit()
+
+        loop = QEventLoop()
+        overlay.closed.connect(on_closed)
+        loop.exec()
+        overlay.closed.disconnect(on_closed)
+
+        if confirmed[0]:
             self._progress_store.reset()
             self._total_score = 0
             self._current_streak = 0
