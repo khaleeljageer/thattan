@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Ezhuthaali - எழுத்தாளி</title>
+    <link href="https://fonts.googleapis.com/css2?family=Catamaran:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Catamaran', 'Noto Sans Tamil', system-ui, sans-serif;
+            background: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .about-dialog {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 80, 100, 0.15),
+                0 0 0 1px rgba(255, 255, 255, 0.8);
+            max-width: 750px;
+            width: 100%;
+            display: flex;
+            overflow: hidden;
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Left Panel - Branding */
+        .left-panel {
+            background: linear-gradient(180deg, #4fb3bf 0%, #00838f 100%);
+            padding: 40px 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 220px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .left-panel::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.15) 0%, transparent 50%);
+        }
+
+        .left-panel::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            right: -30%;
+            width: 150%;
+            height: 150%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 50%);
+        }
+
+        .branding {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            font-size: 40px;
+        }
+
+        .app-name-tamil {
+            font-size: 28px;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            margin-bottom: 4px;
+        }
+
+        .app-name-english {
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.85);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            margin-bottom: 16px;
+        }
+
+        .tagline {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.5;
+            max-width: 160px;
+        }
+
+        /* Right Panel - Content */
+        .right-panel {
+            flex: 1;
+            padding: 28px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Info Section */
+        .info-section {
+            background: #f8fffe;
+            border-radius: 14px;
+            padding: 6px 16px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(0, 131, 143, 0.08);
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(0, 131, 143, 0.06);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .info-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .info-label {
+            font-size: 9px;
+            color: #90a4ae;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            font-size: 13px;
+            color: #1a3a3a;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .info-value a {
+            color: #00838f;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .info-value a:hover {
+            color: #4fb3bf;
+            text-decoration: underline;
+        }
+
+        .copy-btn {
+            width: 28px;
+            height: 28px;
+            background: transparent;
+            border: 1px solid rgba(0, 131, 143, 0.2);
+            border-radius: 6px;
+            color: #90a4ae;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 12px;
+        }
+
+        .copy-btn:hover {
+            background: #e0f7fa;
+            border-color: #00838f;
+            color: #00838f;
+        }
+
+        .copy-btn.copied {
+            background: #e8f5e9;
+            border-color: #66bb6a;
+            color: #66bb6a;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .action-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #f8fffe;
+            border: 1px solid rgba(0, 131, 143, 0.12);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .action-btn:hover {
+            background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
+            border-color: #00838f;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 131, 143, 0.15);
+        }
+
+        .action-btn-icon {
+            font-size: 18px;
+        }
+
+        .action-btn-text {
+            font-size: 12px;
+            font-weight: 600;
+            color: #4a6572;
+        }
+
+        .action-btn:hover .action-btn-text {
+            color: #00838f;
+        }
+
+        /* License Section */
+        .license-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 10px 16px;
+            background: #fafafa;
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+
+        .license-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: #90a4ae;
+        }
+
+        .license-item span {
+            font-weight: 600;
+            color: #4a6572;
+        }
+
+        .license-item a {
+            color: #00838f;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .license-item a:hover {
+            text-decoration: underline;
+        }
+
+        /* Footer Buttons */
+        .footer-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .btn-secondary {
+            flex: 1;
+            padding: 12px 16px;
+            background: transparent;
+            border: 2px solid rgba(0, 131, 143, 0.25);
+            border-radius: 10px;
+            color: #00838f;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 131, 143, 0.08);
+            border-color: #00838f;
+        }
+
+        .btn-primary {
+            flex: 1;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #4fb3bf 0%, #00838f 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 131, 143, 0.25);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 131, 143, 0.35);
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: fixed;
+            background: #1a3a3a;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 1000;
+        }
+
+        .tooltip.show {
+            opacity: 1;
+        }
+
+        /* Responsive */
+        @media (max-width: 650px) {
+            .about-dialog {
+                flex-direction: column;
+                max-width: 400px;
+            }
+
+            .left-panel {
+                min-width: auto;
+                padding: 30px 24px;
+            }
+
+            .tagline {
+                max-width: 100%;
+            }
+
+            .right-panel {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="about-dialog">
+        <!-- Left Panel - Branding -->
+        <div class="left-panel">
+            <div class="branding">
+                <div class="logo">📝</div>
+                <div class="app-name-tamil">எழுத்தாளி</div>
+                <div class="app-name-english">Ezhuthaali</div>
+                <div class="version-badge">v1.0.0</div>
+                <div class="tagline">தமிழில் தட்டச்சு கற்க எளிய வழி</div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Content -->
+        <div class="right-panel">
+            <!-- Info Section -->
+            <div class="info-section">
+                <div class="info-row">
+                    <div class="info-icon">👤</div>
+                    <div class="info-content">
+                        <div class="info-label">Author</div>
+                        <div class="info-value">Khaleel Jageer</div>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-icon">🏢</div>
+                    <div class="info-content">
+                        <div class="info-label">Organization</div>
+                        <div class="info-value">
+                            <a href="https://kaniyam.com" target="_blank">Kaniyam Foundation</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-icon">📧</div>
+                    <div class="info-content">
+                        <div class="info-label">Email</div>
+                        <div class="info-value">jskcse4@gmail.com</div>
+                    </div>
+                    <button class="copy-btn" onclick="copyEmail(this)" title="Copy email">
+                        📋
+                    </button>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <a href="https://github.com/khaleeljageer/ezhuthaali" target="_blank" class="action-btn">
+                    <span class="action-btn-icon">💻</span>
+                    <span class="action-btn-text">GitHub</span>
+                </a>
+                <a href="https://kaniyam.com" target="_blank" class="action-btn">
+                    <span class="action-btn-icon">🌐</span>
+                    <span class="action-btn-text">Website</span>
+                </a>
+            </div>
+
+            <!-- License Section -->
+            <div class="license-section">
+                <div class="license-item">
+                    📜 License: <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">GPL v3</a>
+                </div>
+                <div class="license-item">
+                    🛠️ Built with: <span>Python + PySide6</span>
+                </div>
+            </div>
+
+            <!-- Footer Buttons -->
+            <div class="footer-buttons">
+                <a href="https://github.com/khaleeljageer/ezhuthaali/issues" target="_blank" class="btn-secondary">
+                    🐛 Report Issue
+                </a>
+                <button class="btn-primary" onclick="closeDialog()">
+                    மூடு
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div class="tooltip" id="tooltip">Copied!</div>
+
+    <script>
+        function copyEmail(btn) {
+            const email = 'jskcse4@gmail.com';
+            navigator.clipboard.writeText(email).then(() => {
+                btn.innerHTML = '✓';
+                btn.classList.add('copied');
+                
+                const tooltip = document.getElementById('tooltip');
+                const rect = btn.getBoundingClientRect();
+                tooltip.style.left = rect.left - 20 + 'px';
+                tooltip.style.top = rect.top - 35 + 'px';
+                tooltip.classList.add('show');
+                
+                setTimeout(() => {
+                    btn.innerHTML = '📋';
+                    btn.classList.remove('copied');
+                    tooltip.classList.remove('show');
+                }, 2000);
+            });
+        }
+
+        function closeDialog() {
+            const dialog = document.querySelector('.about-dialog');
+            dialog.style.animation = 'fadeOut 0.3s ease-in forwards';
+            setTimeout(() => {
+                alert('Dialog closed!');
+                dialog.style.animation = 'slideUp 0.4s ease-out';
+            }, 300);
+        }
+
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeOut {
+                from { opacity: 1; transform: scale(1); }
+                to { opacity: 0; transform: scale(0.95); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

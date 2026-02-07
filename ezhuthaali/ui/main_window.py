@@ -380,7 +380,7 @@ class AboutKaniyamDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("எங்களை பற்றி")
         self.setModal(True)
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(640)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setStyleSheet("QDialog { background: transparent; }")
@@ -399,64 +399,162 @@ class AboutKaniyamDialog(QDialog):
         overlay.mousePressEvent = lambda e: self.accept()
         main_layout.addWidget(overlay, 0, 0)
 
+        radius = 24
         container = QFrame(self)
         container.setObjectName("aboutContainer")
-        radius = 20
+        container.setMinimumWidth(640)
         container.setStyleSheet(
             f"""
             QFrame#aboutContainer {{
-                background: #ffffff;
-                border: 1px solid {HomeColors.CARD_BORDER};
+                background: transparent;
+                border: none;
                 border-radius: {radius}px;
             }}
             """
         )
-        layout = QVBoxLayout(container)
-        layout.setSpacing(16)
-        layout.setContentsMargins(28, 28, 28, 28)
-        main_layout.addWidget(container, 0, 0, 1, 1, Qt.AlignCenter)
+        container_shadow = QGraphicsDropShadowEffect(container)
+        container_shadow.setBlurRadius(24)
+        container_shadow.setOffset(0, 8)
+        container_shadow.setColor(QColor(0, 0, 0, 45))
+        container.setGraphicsEffect(container_shadow)
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
 
-        title = QLabel("Kaniyam Foundation")
-        title.setStyleSheet(
-            f"color: {HomeColors.PRIMARY}; font-size: 22px; font-weight: 900;"
+        header = QFrame()
+        header.setObjectName("aboutHeader")
+        header.setStyleSheet(
+            f"""
+            QFrame#aboutHeader {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {HomeColors.PRIMARY_LIGHT}, stop:1 {HomeColors.PRIMARY});
+                border-radius: {radius}px {radius}px 0 0;
+            }}
+            """
         )
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(28, 24, 28, 20)
+        header_layout.setSpacing(10)
+        icon_box = QFrame()
+        icon_box.setFixedSize(72, 72)
+        icon_box.setStyleSheet(
+            "QFrame { background: transparent; border: none; border-radius: 20px; }"
+        )
+        icon_layout = QVBoxLayout(icon_box)
+        icon_layout.setContentsMargins(0, 0, 0, 0)
+        logo_path = Path(__file__).resolve().parent.parent / "assets" / "logo" / "logo.svg"
+        if not logo_path.exists():
+            logo_path = Path(__file__).resolve().parent.parent / "assets" / "logo" / "logo_256.png"
+        icon_label = QLabel()
+        if logo_path.exists():
+            icon_label.setPixmap(QIcon(str(logo_path)).pixmap(QSize(72, 72)))
+        else:
+            icon_label.setText("த")
+            icon_label.setStyleSheet(f"color: {HomeColors.PRIMARY}; font-size: 36px; font-weight: 900;")
+        icon_label.setAlignment(Qt.AlignCenter)
+        icon_layout.addWidget(icon_label)
+        header_layout.addWidget(icon_box, 0, Qt.AlignCenter)
+        title_ta = QLabel("எழுத்தாளி")
+        title_ta.setStyleSheet("color: white; font-size: 26px; font-weight: 900;")
+        title_ta.setAlignment(Qt.AlignCenter)
+        header_layout.addWidget(title_ta, 0, Qt.AlignCenter)
+        title_en = QLabel("EZHUTHAALI")
+        title_en.setStyleSheet("color: rgba(255,255,255,0.95); font-size: 12px; font-weight: 700; letter-spacing: 4px;")
+        title_en.setAlignment(Qt.AlignCenter)
+        header_layout.addWidget(title_en, 0, Qt.AlignCenter)
+        version_pill = QLabel("V1.0.0")
+        version_pill.setStyleSheet(
+            "background: rgba(255,255,255,0.25); color: white; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 999px;"
+        )
+        version_pill.setAlignment(Qt.AlignCenter)
+        version_pill.setFixedHeight(28)
+        header_layout.addWidget(version_pill, 0, Qt.AlignCenter)
+        tagline = QLabel("தமிழில் தட்டச்சு கற்க எளிய வழி")
+        tagline.setStyleSheet("color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 600;")
+        tagline.setAlignment(Qt.AlignCenter)
+        header_layout.addWidget(tagline, 0, Qt.AlignCenter)
+        container_layout.addWidget(header)
 
-        body = QLabel(
-            "கணியம் அறக்கட்டளை தமிழ் மொழி மற்றும் தொழில்நுட்பத்தை இணைக்கும் "
-            "திட்டங்களை ஊக்குவிக்கிறது. எழுத்தாளி தமிழ் தட்டச்சு கற்றலை எளிமையாக்கும் "
-            "ஒரு சாதனம்."
-        )
-        body.setWordWrap(True)
-        body.setStyleSheet(
-            f"color: {HomeColors.TEXT_PRIMARY}; font-size: 14px; font-weight: 500; line-height: 1.5;"
-        )
-        body.setAlignment(Qt.AlignCenter)
-        layout.addWidget(body)
+        body = QFrame()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(28, 20, 28, 24)
+        body_layout.setSpacing(18)
 
-        about_html = (
-            "<b>Author:</b> Khaleel Jageer<br>"
-            "<b>Email:</b> jskcse4@gmail.com<br>"
-            "<b>Organization:</b> Kaniyam Foundation<br>"
-            "<b>Version:</b> 1.0.0<br>"
-            "<b>Project Repository:</b> "
-            '<a href="https://github.com/khaleeljageer/ezhuthaali">https://github.com/khaleeljageer/ezhuthaali</a><br>'
-            "<br><b>Thanks to:</b><br>"
-            'PySide6 (<a href="https://wiki.qt.io/PySide2">https://wiki.qt.io/PySide2</a>)<br>'
-            "This project is licensed under "
-            '<a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL v3</a>.'
-        )
-        info_label = QLabel(about_html)
-        info_label.setWordWrap(True)
-        info_label.setTextFormat(Qt.TextFormat.RichText)
-        info_label.setOpenExternalLinks(True)
-        info_label.setStyleSheet(
-            f"color: {HomeColors.TEXT_PRIMARY}; font-size: 13px; line-height: 1.5;"
-        )
-        info_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(info_label)
+        def _info_row_dlg(icon_char: str, label: str, value: str, is_link: bool = False, url: str = "") -> QWidget:
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 6, 0, 6)
+            row_layout.setSpacing(12)
+            icon_frame = QFrame()
+            icon_frame.setFixedSize(36, 36)
+            icon_frame.setStyleSheet("background: rgba(0, 131, 143, 0.12); border-radius: 12px;")
+            icon_lo = QVBoxLayout(icon_frame)
+            icon_lo.setContentsMargins(0, 0, 0, 0)
+            ic = QLabel(icon_char)
+            ic.setAlignment(Qt.AlignCenter)
+            ic.setStyleSheet(f"color: {HomeColors.PRIMARY}; font-size: 16px;")
+            icon_lo.addWidget(ic)
+            row_layout.addWidget(icon_frame, 0)
+            col = QVBoxLayout()
+            col.setSpacing(2)
+            lbl = QLabel(label)
+            lbl.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 10px; font-weight: 700; letter-spacing: 1px;")
+            col.addWidget(lbl)
+            if is_link and url:
+                val = QLabel(f'<a href="{url}">{value}</a>')
+                val.setOpenExternalLinks(True)
+                val.setTextFormat(Qt.TextFormat.RichText)
+                val.setStyleSheet(f"font-size: 14px; font-weight: 500; color: {HomeColors.PRIMARY};")
+            else:
+                val = QLabel(value)
+                val.setStyleSheet(f"color: {HomeColors.TEXT_PRIMARY}; font-size: 14px; font-weight: 500;")
+            col.addWidget(val)
+            row_layout.addLayout(col, 1)
+            return row
 
+        body_layout.addWidget(_info_row_dlg("👤", "AUTHOR", "Khaleel Jageer"))
+        body_layout.addWidget(_info_row_dlg("🏢", "ORGANIZATION", "Kaniyam Foundation", True, "https://www.kaniyam.com"))
+        body_layout.addWidget(_info_row_dlg("✉", "EMAIL", "jskcse4@gmail.com"))
+        link_row = QHBoxLayout()
+        link_row.setSpacing(12)
+        for text, url in [
+            ("GitHub", "https://github.com/khaleeljageer/ezhuthaali"),
+            ("Website", "https://www.kaniyam.com"),
+        ]:
+            card = QPushButton(text)
+            card.setCursor(Qt.CursorShape.PointingHandCursor)
+            card.setStyleSheet(
+                f"""
+                QPushButton {{
+                    background: white;
+                    color: {HomeColors.TEXT_PRIMARY};
+                    padding: 14px 20px;
+                    border: 1px solid {HomeColors.CARD_BORDER};
+                    border-radius: 14px;
+                    font-weight: 600;
+                    font-size: 13px;
+                }}
+                QPushButton:hover {{ background: {HomeColors.CARD_BG_HOVER}; border-color: {HomeColors.PRIMARY_LIGHT}; }}
+                """
+            )
+            card.setMinimumHeight(56)
+            card.clicked.connect(lambda _u=url: QDesktopServices.openUrl(QUrl(_u)))
+            link_row.addWidget(card, 1)
+        body_layout.addLayout(link_row)
+        footer_line = QHBoxLayout()
+        footer_line.setSpacing(16)
+        license_lbl = QLabel('License: <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL v3</a>')
+        license_lbl.setOpenExternalLinks(True)
+        license_lbl.setTextFormat(Qt.TextFormat.RichText)
+        license_lbl.setStyleSheet(f"color: {HomeColors.TEXT_SECONDARY}; font-size: 12px;")
+        footer_line.addWidget(license_lbl, 0)
+        footer_line.addStretch(1)
+        built_lbl = QLabel("Built with: Python + PySide6")
+        built_lbl.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 12px;")
+        footer_line.addWidget(built_lbl, 0)
+        body_layout.addLayout(footer_line)
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
         report_issue_url = "https://github.com/khaleeljageer/ezhuthaali/issues/new"
         bug_icon_path = Path(__file__).resolve().parent.parent / "assets" / "icons" / "icon_bug.svg"
         report_btn = QPushButton("Report Issue")
@@ -466,22 +564,21 @@ class AboutKaniyamDialog(QDialog):
         report_btn.setStyleSheet(
             f"""
             QPushButton {{
-                background: transparent;
-                color: {HomeColors.PRIMARY};
+                background: white;
+                color: {HomeColors.TEXT_PRIMARY};
                 padding: 10px 20px;
-                border: 2px solid {HomeColors.PRIMARY};
+                border: 2px solid {HomeColors.CARD_BORDER};
                 border-radius: 12px;
                 font-weight: 600;
                 font-size: 13px;
             }}
-            QPushButton:hover {{ background: rgba(0, 131, 143, 0.1); }}
+            QPushButton:hover {{ border-color: {HomeColors.PRIMARY}; color: {HomeColors.PRIMARY}; }}
             """
         )
         report_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         report_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         report_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(report_issue_url)))
-        layout.addWidget(report_btn)
-
+        btn_row.addWidget(report_btn, 1)
         close_btn = QPushButton("மூடு")
         close_btn.setStyleSheet(
             f"""
@@ -501,7 +598,10 @@ class AboutKaniyamDialog(QDialog):
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn)
+        btn_row.addWidget(close_btn, 1)
+        body_layout.addLayout(btn_row)
+        container_layout.addWidget(body)
+        main_layout.addWidget(container, 0, 0, 1, 1, Qt.AlignCenter)
 
 
 class AboutOverlay(QWidget):
@@ -511,8 +611,6 @@ class AboutOverlay(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
-        self.setStyleSheet("")
         main_layout = QGridLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -532,52 +630,234 @@ class AboutOverlay(QWidget):
         overlay_bg.mousePressEvent = on_overlay_click
         main_layout.addWidget(overlay_bg, 0, 0)
 
+        radius = 24
         container = QFrame(self)
         container.setObjectName("aboutContainer")
-        radius = 20
+        container.setMinimumWidth(680)
+        container.setMaximumWidth(920)
         container.setStyleSheet(
             f"""
             QFrame#aboutContainer {{
                 background: #ffffff;
-                border: 1px solid {HomeColors.CARD_BORDER};
+                border: 1px solid #e8e8e8;
                 border-radius: {radius}px;
             }}
             """
         )
-        layout = QVBoxLayout(container)
-        layout.setSpacing(16)
-        layout.setContentsMargins(28, 28, 28, 28)
-        main_layout.addWidget(container, 0, 0, 1, 1, Qt.AlignCenter)
+        container_shadow = QGraphicsDropShadowEffect(container)
+        container_shadow.setBlurRadius(24)
+        container_shadow.setOffset(0, 8)
+        container_shadow.setColor(QColor(0, 80, 100, 25))
+        container.setGraphicsEffect(container_shadow)
+        container_layout = QHBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
 
-        title = QLabel("About Ezhuthaali")
-        title.setStyleSheet(
-            f"color: {HomeColors.PRIMARY}; font-size: 22px; font-weight: 900;"
+        # ---- Left panel: branding (teal gradient) ----
+        left_panel = QFrame()
+        left_panel.setObjectName("aboutLeftPanel")
+        left_panel.setFixedWidth(240)
+        left_panel.setStyleSheet(
+            f"""
+            QFrame#aboutLeftPanel {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {HomeColors.PRIMARY_LIGHT}, stop:1 {HomeColors.PRIMARY});
+                border-top-left-radius: {radius}px;
+                border-bottom-left-radius: {radius}px;
+                border-top-right-radius: 0;
+                border-bottom-right-radius: 0;
+            }}
+            """
         )
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(32, 40, 32, 40)
+        left_layout.setSpacing(16)
 
-        about_html = (
-            "<b>Author:</b> Khaleel Jageer<br>"
-            "<b>Email:</b> jskcse4@gmail.com<br>"
-            '<b>Organization:</b> <a href="https://www.kaniyam.com">Kaniyam Foundation</a><br>'
-            "<b>Version:</b> 1.0.0<br>"
-            "<b>Project Repository:</b> "
-            '<a href="https://github.com/khaleeljageer/ezhuthaali">https://github.com/khaleeljageer/ezhuthaali</a><br>'
-            "<br><b>Thanks to:</b><br>"
-            'PySide6 (<a href="https://wiki.qt.io/PySide2">https://wiki.qt.io/PySide2</a>)<br>'
-            "This project is licensed under "
-            '<a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL v3</a>.'
+        icon_box = QFrame()
+        icon_box.setFixedSize(80, 80)
+        icon_box.setStyleSheet(
+            """
+            QFrame {
+                background: transparent;
+                border: none;
+                border-radius: 24px;
+            }
+            """
         )
-        info_label = QLabel(about_html)
-        info_label.setWordWrap(True)
-        info_label.setTextFormat(Qt.TextFormat.RichText)
-        info_label.setOpenExternalLinks(True)
-        info_label.setStyleSheet(
-            f"color: {HomeColors.TEXT_PRIMARY}; font-size: 13px; line-height: 1.5;"
-        )
-        info_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(info_label)
+        icon_layout = QVBoxLayout(icon_box)
+        icon_layout.setContentsMargins(0, 0, 0, 0)
+        logo_path = Path(__file__).resolve().parent.parent / "assets" / "logo" / "logo.svg"
+        if not logo_path.exists():
+            logo_path = Path(__file__).resolve().parent.parent / "assets" / "logo" / "logo_256.png"
+        icon_label = QLabel()
+        if logo_path.exists():
+            icon_label.setPixmap(QIcon(str(logo_path)).pixmap(QSize(80, 80)))
+        else:
+            icon_label.setText("த")
+            icon_label.setStyleSheet(f"color: {HomeColors.PRIMARY}; font-size: 40px; font-weight: 900;")
+        icon_label.setAlignment(Qt.AlignCenter)
+        icon_layout.addWidget(icon_label)
+        left_layout.addWidget(icon_box, 0, Qt.AlignCenter)
 
+        title_ta = QLabel("எழுத்தாளி")
+        title_ta.setStyleSheet("color: white; font-size: 28px; font-weight: 800;")
+        title_ta.setAlignment(Qt.AlignCenter)
+        left_layout.addWidget(title_ta, 0, Qt.AlignCenter)
+
+        title_en = QLabel("EZHUTHAALI")
+        title_en.setStyleSheet("color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 500; letter-spacing: 3px;")
+        title_en.setAlignment(Qt.AlignCenter)
+        left_layout.addWidget(title_en, 0, Qt.AlignCenter)
+
+        version_pill = QLabel("V1.0.0")
+        version_pill.setStyleSheet(
+            "color: white; font-size: 12px; "
+        )
+        version_pill.setAlignment(Qt.AlignCenter)
+        version_pill.setFixedHeight(28)
+        left_layout.addWidget(version_pill, 0, Qt.AlignCenter)
+
+        tagline = QLabel("தமிழில் தட்டச்சு கற்க எளிய வழி")
+        tagline.setStyleSheet("color: rgba(255,255,255,0.9); font-size: 12px; font-weight: 500;")
+        tagline.setAlignment(Qt.AlignCenter)
+        tagline.setWordWrap(True)
+        left_layout.addWidget(tagline, 0, Qt.AlignCenter)
+
+        left_layout.addStretch(1)
+        container_layout.addWidget(left_panel)
+
+        # ---- Right panel: content (white background) ----
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(28, 28, 28, 28)
+        right_layout.setSpacing(12)
+
+        # Single info card: Author, Organization, Email (no internal dividers)
+        info_section = QFrame()
+        info_section.setObjectName("aboutInfoCard")
+        info_section.setStyleSheet(
+            """
+            QFrame#aboutInfoCard {
+                background: #ffffff;
+                border: 1px solid rgba(0, 131, 143, 0.12);
+                border-radius: 16px;
+            }
+            """
+        )
+        info_inner = QVBoxLayout(info_section)
+        info_inner.setContentsMargins(20, 18, 20, 18)
+        info_inner.setSpacing(20)
+
+        def _info_row(icon_char: str, label: str, value: str, is_link: bool = False, url: str = "") -> QWidget:
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(14)
+            icon_frame = QFrame()
+            icon_frame.setFixedSize(40, 40)
+            icon_frame.setStyleSheet(
+                """
+                QFrame {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                        stop:0 #e0f7fa, stop:1 #b2ebf2);
+                    border-radius: 12px;
+                }
+                """
+            )
+            icon_lo = QVBoxLayout(icon_frame)
+            icon_lo.setContentsMargins(0, 0, 0, 0)
+            ic = QLabel(icon_char)
+            ic.setAlignment(Qt.AlignCenter)
+            ic.setStyleSheet(f"color: {HomeColors.PRIMARY}; font-size: 18px;")
+            icon_lo.addWidget(ic)
+            row_layout.addWidget(icon_frame, 0)
+            col = QVBoxLayout()
+            col.setSpacing(2)
+            lbl = QLabel(label)
+            lbl.setStyleSheet("color: #90a4ae; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+            col.addWidget(lbl)
+            if is_link and url:
+                val = QLabel(f'<a href="{url}">{value}</a>')
+                val.setOpenExternalLinks(True)
+                val.setTextFormat(Qt.TextFormat.RichText)
+                val.setStyleSheet(f"font-size: 14px; font-weight: 600; color: {HomeColors.PRIMARY};")
+            else:
+                val = QLabel(value)
+                val.setStyleSheet("color: #1a3a3a; font-size: 14px; font-weight: 600;")
+            col.addWidget(val)
+            row_layout.addLayout(col, 1)
+            return row
+
+        def _separator() -> QWidget:
+            wrap = QWidget()
+            wrap_layout = QHBoxLayout(wrap)
+            wrap_layout.setContentsMargins(0, 0, 0, 0)
+            wrap_layout.setSpacing(0)
+            line = QFrame()
+            line.setFixedHeight(1)
+            line.setStyleSheet("background: rgba(0, 131, 143, 0.25); border: none;")
+            line.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            wrap_layout.addWidget(line)
+            return wrap
+
+        info_inner.addWidget(_info_row("👤", "AUTHOR", "Khaleel Jageer"))
+        info_inner.addWidget(_separator())
+        info_inner.addWidget(_info_row("🏢", "ORGANIZATION", "Kaniyam Foundation", True, "https://www.kaniyam.com"))
+        info_inner.addWidget(_separator())
+        info_inner.addWidget(_info_row("📧", "EMAIL", "jskcse4@gmail.com"))
+        right_layout.addWidget(info_section)
+
+        # GitHub & Website: light buttons with light grey border
+        link_row = QHBoxLayout()
+        link_row.setSpacing(10)
+        for text, url, symbol in [
+            ("GitHub", "https://github.com/khaleeljageer/ezhuthaali", "💻"),
+            ("Website", "https://www.kaniyam.com", "🌐"),
+        ]:
+            card = QPushButton(f"  {symbol}  {text}")
+            card.setCursor(Qt.CursorShape.PointingHandCursor)
+            card.setStyleSheet(
+                """
+                QPushButton {
+                    background: #fafafa;
+                    color: #1a3a3a;
+                    padding: 12px 16px;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 14px;
+                    font-weight: 600;
+                    font-size: 13px;
+                }
+                QPushButton:hover {
+                    background: #f0f0f0;
+                    border-color: #00838f;
+                    color: #00838f;
+                }
+                """
+            )
+            card.setMinimumHeight(48)
+            card.clicked.connect(lambda _u=url: QDesktopServices.openUrl(QUrl(_u)))
+            link_row.addWidget(card, 1)
+        right_layout.addLayout(link_row)
+
+        # License and Built with (centered, light grey text)
+        license_section = QWidget()
+        footer_line = QHBoxLayout(license_section)
+        footer_line.setContentsMargins(0, 8, 0, 8)
+        footer_line.setSpacing(24)
+        license_lbl = QLabel('📜 License: <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL v3</a>')
+        license_lbl.setOpenExternalLinks(True)
+        license_lbl.setTextFormat(Qt.TextFormat.RichText)
+        license_lbl.setStyleSheet("color: #78909c; font-size: 12px;")
+        footer_line.addWidget(license_lbl, 0)
+        footer_line.addStretch(1)
+        built_lbl = QLabel("🛠️ Built with: Python + PySide6")
+        built_lbl.setStyleSheet("color: #78909c; font-size: 12px;")
+        footer_line.addWidget(built_lbl, 0)
+        right_layout.addWidget(license_section)
+
+        # Buttons: Report Issue (left), Close (right)
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
         report_issue_url = "https://github.com/khaleeljageer/ezhuthaali/issues/new"
         bug_icon_path = Path(__file__).resolve().parent.parent / "assets" / "icons" / "icon_bug.svg"
         report_btn = QPushButton("Report Issue")
@@ -585,23 +865,27 @@ class AboutOverlay(QWidget):
             report_btn.setIcon(QIcon(str(bug_icon_path)))
         report_btn.setIconSize(QSize(18, 18))
         report_btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                background: transparent;
-                color: {HomeColors.PRIMARY};
-                padding: 10px 20px;
-                border: 2px solid {HomeColors.PRIMARY};
-                border-radius: 12px;
+            """
+            QPushButton {
+                background: #fafafa;
+                color: #1a3a3a;
+                padding: 12px 16px;
+                border: 1px solid #e0e0e0;
+                border-radius: 14px;
                 font-weight: 600;
                 font-size: 13px;
-            }}
-            QPushButton:hover {{ background: rgba(0, 131, 143, 0.1); }}
+            }
+            QPushButton:hover {
+                background: #f0f0f0;
+                border-color: #00838f;
+                color: #00838f;
+            }
             """
         )
         report_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         report_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         report_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(report_issue_url)))
-        layout.addWidget(report_btn)
+        btn_row.addWidget(report_btn, 1)
 
         close_btn = QPushButton("மூடு")
         close_btn.setStyleSheet(
@@ -610,10 +894,10 @@ class AboutOverlay(QWidget):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                     stop:0 {HomeColors.PRIMARY_LIGHT}, stop:1 {HomeColors.PRIMARY});
                 color: white;
-                padding: 10px 24px;
+                padding: 12px 16px;
                 border: none;
-                border-radius: 12px;
-                font-weight: 700;
+                border-radius: 14px;
+                font-weight: 600;
                 font-size: 13px;
             }}
             QPushButton:hover {{ background: {HomeColors.PRIMARY}; }}
@@ -622,7 +906,11 @@ class AboutOverlay(QWidget):
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         close_btn.clicked.connect(lambda: (self.hide(), self.closed.emit()))
-        layout.addWidget(close_btn)
+        btn_row.addWidget(close_btn, 1)
+
+        right_layout.addLayout(btn_row)
+        container_layout.addWidget(right_panel, 1)
+        main_layout.addWidget(container, 0, 0, 1, 1, Qt.AlignCenter)
 
     def _update_geometry(self) -> None:
         parent = self.parentWidget()
@@ -1754,12 +2042,12 @@ class MainWindow(QMainWindow):
         logo = QFrame()
         logo.setFixedSize(60, 60)
         logo.setStyleSheet(
-            f"""
-            QFrame {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {HomeColors.PRIMARY_LIGHT}, stop:1 {HomeColors.PRIMARY});
+            """
+            QFrame {
+                background: transparent;
+                border: none;
                 border-radius: 15px;
-            }}
+            }
             """
         )
         logo_shadow = QGraphicsDropShadowEffect(logo)
@@ -1769,9 +2057,16 @@ class MainWindow(QMainWindow):
         logo.setGraphicsEffect(logo_shadow)
         logo_layout = QVBoxLayout(logo)
         logo_layout.setContentsMargins(0, 0, 0, 0)
-        logo_label = QLabel("த")
+        logo_path = Path(__file__).resolve().parent.parent / "assets" / "logo" / "logo.svg"
+        if not logo_path.exists():
+            logo_path = Path(__file__).resolve().parent.parent / "assets" / "logo" / "logo_256.png"
+        logo_label = QLabel()
+        if logo_path.exists():
+            logo_label.setPixmap(QIcon(str(logo_path)).pixmap(QSize(60, 60)))
+        else:
+            logo_label.setText("த")
+            logo_label.setStyleSheet("color: white; font-size: 32px; font-weight: 900;")
         logo_label.setAlignment(Qt.AlignCenter)
-        logo_label.setStyleSheet("color: white; font-size: 32px; font-weight: 900;")
         logo_layout.addWidget(logo_label)
         header_row.addWidget(logo, 0)
 

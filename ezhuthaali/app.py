@@ -2,7 +2,7 @@ import logging
 import sys
 from pathlib import Path
 
-from PySide6.QtGui import QGuiApplication, QFontDatabase, QFont
+from PySide6.QtGui import QGuiApplication, QFontDatabase, QFont, QIcon
 from PySide6.QtWidgets import QApplication
 
 from ezhuthaali.core.progress import ProgressStore
@@ -74,6 +74,14 @@ def run() -> None:
 
     levels = LevelRepository()
     progress_store = ProgressStore()
+
+    # Window icon (taskbar / title bar)
+    logo_dir = Path(__file__).parent / "assets" / "logo"
+    for name in ("logo_256.png", "logo.svg"):
+        icon_path = logo_dir / name
+        if icon_path.exists():
+            app.setWindowIcon(QIcon(str(icon_path)))
+            break
 
     window = MainWindow(levels=levels, progress_store=progress_store)
     screen = QGuiApplication.primaryScreen()
