@@ -138,3 +138,6 @@ dmypy.json
 *.pyc
 *.pyo
 *.pyd
+
+test.py
+tamil_typing_adaptive.py

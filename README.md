@@ -1,4 +1,4 @@
-# எழுத்தாளி (Ezhuthaali)
+# தட்டான் (Thattan)
 
 A Tamil99 typing practice application built with Python + PySide6. Designed as a production-grade application.
 

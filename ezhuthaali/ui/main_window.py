@@ -1,29 +1,24 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import html
 import re
 import os
 import logging
+import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
-from PySide6.QtCore import Qt, QDateTime, QPoint, QPointF, QTimer, QSize, QPropertyAnimation, QRectF
+from PySide6.QtCore import Qt, QDateTime, QTimer, QSize, QPropertyAnimation, QEventLoop
 from PySide6.QtGui import (
-    QBrush,
+    QCloseEvent,
     QColor,
     QFont,
     QGuiApplication,
+    QIcon,
     QKeyEvent,
-    QLinearGradient,
-    QPainter,
-    QPainterPath,
-    QPen,
     QPixmap,
-    QRadialGradient,
     QShortcut,
 )
-from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QApplication,
     QGridLayout,
@@ -31,18 +26,13 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QFrame,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
-    QMessageBox,
     QPushButton,
-    QProgressBar,
     QGraphicsOpacityEffect,
     QGraphicsDropShadowEffect,
     QScrollArea,
     QSizePolicy,
     QStackedWidget,
-    QStyle,
     QVBoxLayout,
     QWidget,
 )
@@ -51,762 +41,21 @@ from ezhuthaali.core.levels import LevelRepository, Level
 from ezhuthaali.core.progress import ProgressStore
 from ezhuthaali.core.session import TypingSession, TaskResult
 from ezhuthaali.core.keystroke_tracker import KeystrokeTracker, Tamil99KeyboardLayout
-
-
-@dataclass
-class LevelState:
-    level: Level
-    unlocked: bool
-    completed: int
-    is_current: bool = False
-
-
-class AspectRatioWidget(QWidget):
-    """Widget that maintains a fixed aspect ratio"""
-    def __init__(self, aspect_ratio: float = 2.45, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-        self._aspect_ratio = aspect_ratio
-        # Use Expanding policy for both to allow proper scaling
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-    
-    def setAspectRatio(self, aspect_ratio: float) -> None:
-        """Set the aspect ratio (width/height)"""
-        self._aspect_ratio = aspect_ratio
-        self.updateGeometry()
-    
-    def hasHeightForWidth(self) -> bool:
-        """Return True to indicate this widget has height-for-width behavior"""
-        return True
-    
-    def heightForWidth(self, width: int) -> int:
-        """Return the height that maintains aspect ratio for given width"""
-        if width > 0:
-            return int(width / self._aspect_ratio)
-        return 400
-    
-    def sizeHint(self) -> QSize:
-        """Return a size hint that maintains aspect ratio"""
-        # Default size based on aspect ratio
-        width = 980
-        height = int(width / self._aspect_ratio)
-        return QSize(width, height)
-    
-    def minimumSizeHint(self) -> QSize:
-        """Return minimum size hint"""
-        return QSize(980, int(980 / self._aspect_ratio))
-    
-    def resizeEvent(self, event) -> None:
-        """Override resize to maintain aspect ratio when layout doesn't respect heightForWidth"""
-        # Don't constrain height - let the layout handle it via heightForWidth
-        # This allows the keyboard to expand and show all text properly
-        super().resizeEvent(event)
-
-
-def _blend_hex(a: str, b: str, t: float) -> str:
-    """Blend two #RRGGBB colors. t=0 -> a, t=1 -> b."""
-    try:
-        a = a.strip()
-        b = b.strip()
-        if not (a.startswith("#") and b.startswith("#") and len(a) == 7 and len(b) == 7):
-            return a
-        t = max(0.0, min(1.0, float(t)))
-        ar, ag, ab = int(a[1:3], 16), int(a[3:5], 16), int(a[5:7], 16)
-        br, bg, bb = int(b[1:3], 16), int(b[3:5], 16), int(b[5:7], 16)
-        r = int(ar + (br - ar) * t)
-        g = int(ag + (bg - ag) * t)
-        bl = int(ab + (bb - ab) * t)
-        return f"#{r:02X}{g:02X}{bl:02X}"
-    except Exception:
-        return a
-
-
-class HomeColors:
-    """Light theme palette (ported from `test.py`)."""
-
-    BG_TOP = "#e0f7fa"
-    BG_MIDDLE = "#b2ebf2"
-    BG_BOTTOM = "#80deea"
-
-    PRIMARY = "#00838f"
-    PRIMARY_LIGHT = "#4fb3bf"
-    PRIMARY_DARK = "#005662"
-
-    CORAL = "#ff8a65"
-    AMBER = "#ffb74d"
-    MINT = "#69f0ae"
-    LAVENDER = "#b39ddb"
-
-    CARD_BG = "rgba(255, 255, 255, 0.85)"
-    CARD_BG_HOVER = "rgba(255, 255, 255, 0.95)"
-    CARD_BORDER = "rgba(255, 255, 255, 0.6)"
-
-    TEXT_PRIMARY = "#1a3a3a"
-    TEXT_SECONDARY = "#4a6572"
-    TEXT_MUTED = "#78909c"
-
-
-class CoolBackground(QWidget):
-    """Gradient background with subtle decorative shapes (light theme)."""
-
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-
-    def paintEvent(self, event) -> None:
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
-
-        gradient = QLinearGradient(0, 0, self.width(), self.height())
-        gradient.setColorAt(0.0, QColor(HomeColors.BG_TOP))
-        gradient.setColorAt(0.5, QColor(HomeColors.BG_MIDDLE))
-        gradient.setColorAt(1.0, QColor(HomeColors.BG_BOTTOM))
-        painter.fillRect(self.rect(), gradient)
-
-        painter.setPen(Qt.NoPen)
-
-        # Soft bubble glows
-        radial1 = QRadialGradient(self.width() * 0.85, self.height() * 0.15, 220)
-        radial1.setColorAt(0, QColor(255, 255, 255, 70))
-        radial1.setColorAt(1, QColor(255, 255, 255, 0))
-        painter.setBrush(radial1)
-        painter.drawEllipse(QPoint(int(self.width() * 0.85), int(self.height() * 0.15)), 220, 220)
-
-        radial2 = QRadialGradient(self.width() * 0.12, self.height() * 0.82, 170)
-        radial2.setColorAt(0, QColor(255, 255, 255, 55))
-        radial2.setColorAt(1, QColor(255, 255, 255, 0))
-        painter.setBrush(radial2)
-        painter.drawEllipse(QPoint(int(self.width() * 0.12), int(self.height() * 0.82)), 170, 170)
-
-        small_circles = [(0.2, 0.3, 90), (0.7, 0.62, 70), (0.9, 0.78, 80), (0.15, 0.62, 60)]
-        for x_ratio, y_ratio, radius in small_circles:
-            radial = QRadialGradient(self.width() * x_ratio, self.height() * y_ratio, radius)
-            radial.setColorAt(0, QColor(255, 255, 255, 40))
-            radial.setColorAt(1, QColor(255, 255, 255, 0))
-            painter.setBrush(radial)
-            painter.drawEllipse(QPoint(int(self.width() * x_ratio), int(self.height() * y_ratio)), radius, radius)
-
-        # Very subtle Tamil letters
-        painter.setOpacity(0.06)
-        font = painter.font()
-        font.setPointSize(90)
-        font.setBold(True)
-        painter.setFont(font)
-        painter.setPen(QColor(HomeColors.PRIMARY_DARK))
-        letters = [('அ', 0.08, 0.22), ('இ', 0.86, 0.35), ('உ', 0.14, 0.78), ('எ', 0.78, 0.83), ('ஒ', 0.48, 0.52)]
-        for letter, x, y in letters:
-            painter.drawText(int(self.width() * x), int(self.height() * y), letter)
-
-
-class HomeProgressBar(QWidget):
-    """Rounded gradient progress bar (ported from `test.py`)."""
-
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self._value = 0
-        self._max_value = 100
-        self._color_start = HomeColors.PRIMARY_LIGHT
-        self._color_end = HomeColors.PRIMARY
-        self.setFixedHeight(10)
-        self.setMinimumWidth(100)
-
-    def set_progress(self, value: int, max_value: int, color_start: Optional[str] = None, color_end: Optional[str] = None) -> None:
-        self._value = int(value)
-        self._max_value = int(max_value) if int(max_value) > 0 else 1
-        if color_start:
-            self._color_start = color_start
-        if color_end:
-            self._color_end = color_end
-        self.update()
-
-    def paintEvent(self, event) -> None:
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
-
-        painter.setBrush(QColor(0, 0, 0, 25))
-        painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(0, 0, self.width(), self.height(), 5, 5)
-
-        progress_width = int((self._value / self._max_value) * self.width()) if self._max_value else 0
-        if progress_width <= 0:
-            return
-
-        gradient = QLinearGradient(0, 0, progress_width, 0)
-        gradient.setColorAt(0, QColor(self._color_start))
-        gradient.setColorAt(1, QColor(self._color_end))
-        painter.setBrush(gradient)
-        painter.drawRoundedRect(0, 0, progress_width, self.height(), 5, 5)
-
-        painter.setBrush(QColor(255, 255, 255, 60))
-        painter.drawRoundedRect(0, 0, progress_width, max(2, self.height() // 2), 5, 5)
-
-
-class GlassCard(QFrame):
-    """Glassmorphism card (ported from `test.py`)."""
-
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self.setObjectName("glassCard")
-        self.setStyleSheet(
-            f"""
-            QFrame#glassCard {{
-                background: {HomeColors.CARD_BG};
-                border: 1px solid {HomeColors.CARD_BORDER};
-                border-radius: 20px;
-            }}
-            """
-        )
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(30)
-        shadow.setOffset(0, 8)
-        shadow.setColor(QColor(0, 50, 70, 40))
-        self.setGraphicsEffect(shadow)
-
-
-class HomeStatCard(QFrame):
-    def __init__(self, icon: str, label: str, value: str, bg_color: str, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self._bg_color = bg_color
-        self.setObjectName("homeStatCard")
-        self.setStyleSheet(
-            f"""
-            QFrame#homeStatCard {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {bg_color}, stop:1 {QColor(bg_color).darker(112).name()});
-                border-radius: 16px;
-                border: none;
-            }}
-            """
-        )
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 14, 18, 14)
-        layout.setSpacing(4)
-        label_widget = QLabel(f"{icon} {label}")
-        label_widget.setStyleSheet("color: rgba(255,255,255,0.92); font-size: 12px; font-weight: 600;")
-        layout.addWidget(label_widget)
-        self.value_label = QLabel(str(value))
-        self.value_label.setStyleSheet("color: white; font-size: 28px; font-weight: 900;")
-        layout.addWidget(self.value_label)
-
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(16)
-        shadow.setOffset(0, 4)
-        shadow.setColor(QColor(0, 0, 0, 50))
-        self.setGraphicsEffect(shadow)
-
-    def set_value(self, value: str) -> None:
-        self.value_label.setText(str(value))
-
-
-class HomeLevelRowCard(QFrame):
-    """Clickable row card for one level (ported from `test.py` and wired to real levels)."""
-
-    def __init__(
-        self,
-        *,
-        level_key: str,
-        level_id: int,
-        title: str,
-        icon: str,
-        current: int,
-        total: int,
-        unlocked: bool,
-        selected: bool,
-        on_click: Callable[[str], None],
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self._level_key = level_key
-        self._unlocked = bool(unlocked)
-        self._selected = bool(selected)
-        self._on_click = on_click
-
-        self.setCursor(Qt.PointingHandCursor if self._unlocked else Qt.ForbiddenCursor)
-        self.setObjectName("homeLevelRowCard")
-        self.setFixedHeight(96)
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(18, 14, 18, 14)
-        layout.setSpacing(16)
-
-        # Icon container
-        icon_container = QFrame()
-        icon_container.setFixedSize(56, 56)
-        icon_container.setObjectName("levelIconBox")
-        icon_color = self._progress_color(current, total)
-        if self._unlocked:
-            icon_container.setStyleSheet(
-                f"""
-                QFrame#levelIconBox {{
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                        stop:0 {icon_color}, stop:1 {QColor(icon_color).darker(115).name()});
-                    border-radius: 16px;
-                }}
-                """
-            )
-        else:
-            icon_container.setStyleSheet(
-                """
-                QFrame#levelIconBox {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                        stop:0 #cfd8dc, stop:1 #b0bec5);
-                    border-radius: 16px;
-                }
-                """
-            )
-
-        icon_layout = QVBoxLayout(icon_container)
-        icon_layout.setContentsMargins(0, 0, 0, 0)
-        icon_text = icon if self._unlocked else "🔒"
-        icon_label = QLabel(icon_text)
-        icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setStyleSheet("color: white; font-size: 24px; font-weight: 900;")
-        icon_layout.addWidget(icon_label)
-
-        layout.addWidget(icon_container)
-
-        # Info section
-        info_widget = QWidget()
-        info_layout = QVBoxLayout(info_widget)
-        info_layout.setContentsMargins(0, 0, 0, 0)
-        info_layout.setSpacing(6)
-
-        title_row = QHBoxLayout()
-        title_row.setContentsMargins(0, 0, 0, 0)
-        title_color = HomeColors.TEXT_PRIMARY if self._unlocked else HomeColors.TEXT_MUTED
-        title_label = QLabel(f"நிலை {level_id} — {title}")
-        title_label.setStyleSheet(f"color: {title_color}; font-size: 15px; font-weight: 800;")
-        title_row.addWidget(title_label)
-        title_row.addStretch(1)
-        count_label = QLabel(f"{current}/{total}")
-        count_label.setStyleSheet(f"color: {icon_color}; font-size: 13px; font-weight: 900;")
-        title_row.addWidget(count_label)
-        info_layout.addLayout(title_row)
-
-        self._bar = HomeProgressBar()
-        self._bar.set_progress(current, max(1, total), QColor(icon_color).lighter(120).name(), icon_color)
-        info_layout.addWidget(self._bar)
-
-        percent = self._progress_percent(current, total)
-        percent_label = QLabel(f"{percent}% முடிந்தது")
-        percent_label.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 11px; font-weight: 600;")
-        info_layout.addWidget(percent_label)
-
-        layout.addWidget(info_widget, 1)
-
-        if self._unlocked:
-            arrow = QLabel("›")
-            arrow.setStyleSheet(f"color: {HomeColors.PRIMARY_LIGHT}; font-size: 28px; font-weight: 900;")
-            layout.addWidget(arrow)
-
-        self._apply_style()
-
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20)
-        shadow.setOffset(0, 4)
-        shadow.setColor(QColor(0, 60, 80, 35))
-        self.setGraphicsEffect(shadow)
-
-    def _apply_style(self) -> None:
-        if self._selected:
-            self.setStyleSheet(
-                f"""
-                QFrame#homeLevelRowCard {{
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 rgba(255,255,255,0.98), stop:1 rgba(224,247,250,0.95));
-                    border: 2px solid {HomeColors.PRIMARY};
-                    border-radius: 18px;
-                }}
-                """
-            )
-        else:
-            self.setStyleSheet(
-                f"""
-                QFrame#homeLevelRowCard {{
-                    background: {HomeColors.CARD_BG};
-                    border: 1px solid rgba(255,255,255,0.5);
-                    border-radius: 18px;
-                }}
-                """
-            )
-        if not self._unlocked:
-            self.setStyleSheet(self.styleSheet() + "QFrame#homeLevelRowCard { opacity: 0.65; }")
-
-    @staticmethod
-    def _progress_percent(current: int, total: int) -> int:
-        if total <= 0:
-            return 0
-        return round((current / total) * 100)
-
-    @staticmethod
-    def _progress_color(current: int, total: int) -> str:
-        if total <= 0:
-            return HomeColors.TEXT_MUTED
-        percent = (current / total) * 100
-        if percent == 0:
-            return "#90a4ae"
-        if percent < 30:
-            return HomeColors.CORAL
-        if percent < 70:
-            return HomeColors.AMBER
-        return HomeColors.MINT
-
-    def set_selected(self, selected: bool) -> None:
-        self._selected = bool(selected)
-        self._apply_style()
-
-    def enterEvent(self, event) -> None:
-        if self._unlocked and not self._selected:
-            self.setStyleSheet(
-                f"""
-                QFrame#homeLevelRowCard {{
-                    background: {HomeColors.CARD_BG_HOVER};
-                    border: 1px solid {HomeColors.PRIMARY_LIGHT};
-                    border-radius: 18px;
-                }}
-                """
-            )
-        super().enterEvent(event)
-
-    def leaveEvent(self, event) -> None:
-        self._apply_style()
-        super().leaveEvent(event)
-
-    def mousePressEvent(self, event) -> None:
-        if self._unlocked:
-            self._on_click(self._level_key)
-        super().mousePressEvent(event)
-
-class LevelCard(QWidget):
-    """A clickable, styled level card with optional progress ring."""
-
-    def __init__(
-        self,
-        *,
-        base_color: str,
-        text_color: str,
-        on_click: Callable[[str], None],
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self._base_color = base_color
-        self._text_color = text_color
-        self._on_click = on_click
-        self._level_key: str = ""
-        self._unlocked: bool = True
-        self._progress: float = 0.0
-        self._is_current: bool = False
-        self._is_completed: bool = False
-
-        self.setObjectName("levelCard")
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        self.setMouseTracking(True)
-        self.setCursor(Qt.PointingHandCursor)
-
-        # Header strip
-        header = QWidget()
-        header.setObjectName("levelCardHeader")
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 8, 10, 8)
-        header_layout.setSpacing(8)
-
-        self._title = QLabel("")
-        self._title.setObjectName("levelCardTitle")
-        self._title.setWordWrap(True)
-        self._title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self._lock_badge = QLabel("🔒")
-        self._lock_badge.setObjectName("levelCardLockBadge")
-        self._lock_badge.setAlignment(Qt.AlignCenter)
-        self._lock_badge.setFixedSize(24, 24)
-
-        header_layout.addWidget(self._title, 1)
-        header_layout.addWidget(self._lock_badge, 0, Qt.AlignRight)
-
-        # Center: percent/lock/check
-        self._center = QLabel("")
-        self._center.setObjectName("levelCardCenter")
-        self._center.setAlignment(Qt.AlignCenter)
-        self._center.setMinimumHeight(86)
-
-        # Start pill for the current playable level
-        self._start_pill = QLabel("காண்போம்")
-        self._start_pill.setObjectName("levelCardStartPill")
-        self._start_pill.setAlignment(Qt.AlignCenter)
-        self._start_pill.setFixedHeight(30)
-        self._start_pill.setVisible(False)
-
-        # XP bar + text
-        self._xp_bar = QProgressBar()
-        self._xp_bar.setObjectName("levelCardXpBar")
-        self._xp_bar.setTextVisible(False)
-        self._xp_bar.setFixedHeight(10)
-        self._xp_bar.setRange(0, 100)
-
-        self._progress_text = QLabel("")
-        self._progress_text.setObjectName("levelCardXpText")
-        self._progress_text.setAlignment(Qt.AlignCenter)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(10)
-        layout.addWidget(header, 0)
-        layout.addStretch(1)
-        layout.addWidget(self._center, 0, Qt.AlignCenter)
-        layout.addWidget(self._start_pill, 0, Qt.AlignHCenter)
-        layout.addStretch(1)
-        layout.addWidget(self._xp_bar)
-        layout.addWidget(self._progress_text)
-
-        # Soft shadow like the reference cards
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(26)
-        shadow.setOffset(0, 10)
-        shadow.setColor(QColor(15, 23, 42, 80))
-        self.setGraphicsEffect(shadow)
-
-        self._apply_styles()
-
-    def _apply_styles(self) -> None:
-        card_top = _blend_hex(self._base_color, "#FFFFFF", 0.18)
-        card_bottom = _blend_hex(self._base_color, "#000000", 0.08)
-        self.setStyleSheet(
-            f"""
-            QWidget#levelCard {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {card_top},
-                    stop:1 {card_bottom}
-                );
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.40);
-            }}
-            QWidget#levelCard:hover {{
-                border: 1px solid rgba(255, 255, 255, 0.68);
-            }}
-            QWidget#levelCardHeader {{
-                background: rgba(255, 255, 255, 0.18);
-                border-radius: 12px;
-                border: 1px solid rgba(255, 255, 255, 0.22);
-            }}
-            QLabel#levelCardTitle {{
-                color: rgba(255, 255, 255, 0.95);
-                font-weight: 900;
-                font-size: 13px;
-            }}
-            QLabel#levelCardLockBadge {{
-                background: rgba(255, 255, 255, 0.30);
-                border-radius: 12px;
-                font-size: 13px;
-            }}
-            QLabel#levelCardCenter {{
-                color: rgba(255, 255, 255, 0.96);
-                font-weight: 900;
-                font-size: 18px;
-            }}
-            QLabel#levelCardStartPill {{
-                background: rgba(255, 255, 255, 0.92);
-                color: rgba(15, 23, 42, 0.74);
-                padding: 0px 14px;
-                border-radius: 15px;
-                font-size: 12px;
-                font-weight: 900;
-            }}
-            QProgressBar#levelCardXpBar {{
-                border: none;
-                border-radius: 5px;
-                background: rgba(255, 255, 255, 0.22);
-            }}
-            QProgressBar#levelCardXpBar::chunk {{
-                border-radius: 5px;
-                background: rgba(255, 255, 255, 0.70);
-            }}
-            QLabel#levelCardXpText {{
-                color: rgba(255, 255, 255, 0.92);
-                font-weight: 800;
-                font-size: 12px;
-            }}
-            """
-        )
-
-    def set_state(self, state: LevelState) -> None:
-        task_count = max(1, len(state.level.tasks))
-        completed = max(0, min(int(state.completed), task_count))
-        self._level_key = state.level.key
-        self._unlocked = bool(state.unlocked)
-        self._progress = completed / float(task_count)
-        self._is_current = bool(state.is_current)
-        self._is_completed = completed >= task_count
-
-        title = state.level.name
-        if state.level.key == "level0":
-            title = f"{title} • தொடக்கம்"
-        self._title.setText(title)
-        self._progress_text.setText(f"{completed}/{task_count} XP")
-        self._xp_bar.setRange(0, task_count)
-        self._xp_bar.setValue(completed)
-
-        if self._unlocked and self._is_completed:
-            self._lock_badge.setVisible(False)
-            self._center.setText("✓")
-            self._start_pill.setVisible(False)
-            self.setToolTip(f"{title}\nமுடிந்தது: {completed}/{task_count}")
-        elif self._unlocked:
-            self._lock_badge.setVisible(False)
-            self._center.setText(f"{self._progress * 100:.1f}%")
-            self._start_pill.setVisible(self._is_current)
-            self.setToolTip(f"{title}\nமுன்னேற்றம்: {completed}/{task_count}")
-        else:
-            self._lock_badge.setVisible(True)
-            self._center.setText("🔒")
-            self._start_pill.setVisible(False)
-            self.setToolTip(f"{title}\nபூட்டப்பட்டது")
-        self.update()
-
-    def mousePressEvent(self, event) -> None:
-        if self._unlocked and self._level_key:
-            self._on_click(self._level_key)
-        super().mousePressEvent(event)
-
-    def paintEvent(self, event) -> None:
-        super().paintEvent(event)
-        if (not self._unlocked) or self._is_completed:
-            return
-        # Draw progress ring behind the center label
-        r = self._center.geometry()
-        size = min(r.width(), r.height())
-        pad = max(10, int(size * 0.15))
-        ring_rect = QRectF(
-            r.x() + pad,
-            r.y() + pad,
-            max(10, r.width() - 2 * pad),
-            max(10, r.height() - 2 * pad),
-        )
-
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
-
-        # background ring
-        bg_pen = QPen(QColor(255, 255, 255, 90))
-        bg_pen.setWidth(max(6, int(ring_rect.width() * 0.09)))
-        bg_pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(bg_pen)
-        painter.drawArc(ring_rect, 90 * 16, -360 * 16)
-
-        # progress arc
-        grad = QLinearGradient(ring_rect.topLeft(), ring_rect.bottomRight())
-        grad.setColorAt(0.0, QColor(255, 255, 255, 230))
-        grad.setColorAt(1.0, QColor(255, 255, 255, 170))
-        pen = QPen(QBrush(grad), bg_pen.width())
-        pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(pen)
-        painter.drawArc(ring_rect, 90 * 16, -int(360 * 16 * self._progress))
-
-
-class LevelMapWidget(QWidget):
-    """A canvas that places LevelCards like a 'journey map' and draws connectors."""
-
-    def __init__(
-        self,
-        *,
-        on_level_clicked: Callable[[str], None],
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self._on_level_clicked = on_level_clicked
-        self._cards: list[LevelCard] = []
-        self._states: list[LevelState] = []
-
-        # Palette inspired by the reference screen
-        self._palette = ["#19A7D9", "#F5B23B", "#F26A5A", "#F0A93B", "#2FBF93", "#4D79FF"]
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet("background: transparent;")
-
-        # Relative positions (x,y) in [0..1] for the first few nodes
-        self._positions = [
-            (0.14, 0.18),
-            (0.50, 0.05),
-            (0.80, 0.20),
-            (0.55, 0.34),
-            (0.30, 0.58),
-            (0.70, 0.62),
-        ]
-
-    def set_level_states(self, states: list[LevelState]) -> None:
-        self._states = states
-        while len(self._cards) < len(states):
-            idx = len(self._cards)
-            card = LevelCard(
-                base_color=self._palette[idx % len(self._palette)],
-                text_color="#FFFFFF",
-                on_click=self._on_level_clicked,
-                parent=self,
-            )
-            self._cards.append(card)
-
-        for i, state in enumerate(states):
-            self._cards[i].show()
-            self._cards[i].set_state(state)
-
-        for j in range(len(states), len(self._cards)):
-            self._cards[j].hide()
-
-        self._relayout_cards()
-        self.update()
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self._relayout_cards()
-
-    def _relayout_cards(self) -> None:
-        visible = [c for c in self._cards if c.isVisible()]
-        if not visible:
-            return
-        w = max(1, self.width())
-        h = max(1, self.height())
-
-        # A bit smaller + closer to the reference sizing
-        card_w = max(170, min(250, int(w * 0.22)))
-        card_h = max(160, min(225, int(card_w * 0.84)))
-
-        pad_x = 16
-        pad_y = 12
-
-        for i, card in enumerate(visible):
-            if i < len(self._positions):
-                rx, ry = self._positions[i]
-            else:
-                # fallback: a gentle grid
-                cols = 3
-                row = i // cols
-                col = i % cols
-                rx = 0.12 + col * 0.34
-                ry = 0.10 + row * 0.28
-            x = int(pad_x + rx * max(1, (w - card_w - 2 * pad_x)))
-            y = int(pad_y + ry * max(1, (h - card_h - 2 * pad_y)))
-            card.setGeometry(x, y, card_w, card_h)
-
-    def paintEvent(self, event) -> None:
-        super().paintEvent(event)
-        visible = [c for c in self._cards if c.isVisible()]
-        if len(visible) < 2:
-            return
-
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        pen = QPen(QColor(120, 130, 150, 90))
-        pen.setWidth(6)
-        pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(pen)
-
-        for a, b in zip(visible, visible[1:]):
-            pa = a.geometry().center()
-            pb = b.geometry().center()
-            start = QPointF(pa.x(), pa.y())
-            end = QPointF(pb.x(), pb.y())
-            midx = (start.x() + end.x()) / 2.0
-            path = QPainterPath(start)
-            path.cubicTo(QPointF(midx, start.y()), QPointF(midx, end.y()), end)
-            painter.drawPath(path)
+from ezhuthaali.ui.about_overlay import AboutOverlay
+from ezhuthaali.ui.colors import HomeColors
+from ezhuthaali.ui.custom_overlay import ResetConfirmOverlay, LevelCompletedOverlay
+from ezhuthaali.ui.home_widgets import (
+    AspectRatioWidget,
+    CoolBackground,
+    GlassCard,
+    HomeLevelRowCard,
+    HomeProgressBar,
+    HomeStatCard,
+    ProgressCard,
+)
+from ezhuthaali.ui.level_cards import LevelCard, LevelMapWidget
+from ezhuthaali.ui.models import LevelState
+from ezhuthaali.ui.typing_widgets import HeroLetterLabel, LetterSequenceWidget
 
 
 class MainWindow(QMainWindow):
@@ -826,14 +75,16 @@ class MainWindow(QMainWindow):
         self._task_display_offset: int = 0
         self._unlock_all_levels = os.environ.get("EZUTHALI_UNLOCK_ALL") == "1"
         self._input_has_error = False
-        
-        # Gamification stats
-        self._current_streak: int = 0
-        self._best_streak: int = 0
-        self._total_score: int = 0
+
+        # Gamification stats (loaded from persistent store)
+        ts, cs, bs = self._progress_store.get_gamification()
+        self._total_score: int = ts
+        self._current_streak: int = cs
+        self._best_streak: int = bs
         self._combo_multiplier: float = 1.0
         self._consecutive_correct: int = 0
-        
+        self._view_only_session: bool = False
+
         # Keystroke tracking
         self._keystroke_tracker = KeystrokeTracker()
         self._tamil99_layout = Tamil99KeyboardLayout()
@@ -860,6 +111,19 @@ class MainWindow(QMainWindow):
         self._back_button: Optional[QPushButton] = None
         self._typing_title_label: Optional[QLabel] = None
 
+        # Typing screen: practice UI (letter sequence, hero, stats panel)
+        self._letter_sequence_widget: Optional[LetterSequenceWidget] = None
+        self._hero_letter_label: Optional[HeroLetterLabel] = None
+        self._typing_time_label: Optional[QLabel] = None
+        self._typing_wpm_label: Optional[QLabel] = None
+        self._typing_accuracy_bar: Optional[HomeProgressBar] = None
+        self._typing_accuracy_value: Optional[QLabel] = None
+        self._typing_streak_label: Optional[QLabel] = None
+        self._typing_best_streak_label: Optional[QLabel] = None
+        self._typing_correct_label: Optional[QLabel] = None
+        self._typing_wrong_label: Optional[QLabel] = None
+        self._typing_stats_timer: Optional[QTimer] = None
+
         # Home screen widgets
         self._header_datetime_label: Optional[QLabel] = None
         self._header_timer: Optional[QTimer] = None
@@ -874,13 +138,6 @@ class MainWindow(QMainWindow):
         self._levels_list_container: Optional[QWidget] = None
         self._home_levels_layout: Optional[QVBoxLayout] = None
         
-        # Background SVG
-        self._background_svg_path: Optional[Path] = None
-        self._background_svg_renderer: Optional[QSvgRenderer] = None
-        self._background_label: Optional[QLabel] = None
-        self._background_update_timer: Optional[QTimer] = None
-        self._background_last_render_key: Optional[tuple[int, int, float]] = None
-
         # Invalid input overlay (red flash)
         self._error_overlay: Optional[QWidget] = None
         self._error_overlay_effect: Optional[QGraphicsOpacityEffect] = None
@@ -902,8 +159,7 @@ class MainWindow(QMainWindow):
             - hand: 'left' or 'right'
             - finger: 'thumb', 'index', 'middle', 'ring', 'pinky'
         """
-        mapping = {}
-        
+        mapping: dict[str, tuple[str, str]] = {}
         # Left hand - Pinky
         for key in ['`', '1', 'Q', 'A', 'Z', 'TAB', 'CAPS']:
             mapping[key.upper()] = ('left', 'pinky')
@@ -1180,27 +436,6 @@ class MainWindow(QMainWindow):
             }}
         """)
         
-        # Setup background SVG
-        background_svg_path = Path(__file__).parent.parent / "assets" / "background.svg"
-        if background_svg_path.exists():
-            self._background_svg_path = background_svg_path
-            self._background_svg_renderer = QSvgRenderer(str(background_svg_path))
-
-        # Create background label for SVG (as child of main window to cover entire window)
-        if self._background_svg_renderer:
-            self._background_label = QLabel(self)
-            self._background_label.setAlignment(Qt.AlignCenter)
-            self._background_label.lower()  # Put it behind everything
-            self._background_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)  # Allow clicks to pass through
-            # During interactive resize, allow cheap scaling of last pixmap;
-            # a debounced re-render will refresh it crisply.
-            self._background_label.setScaledContents(True)
-
-            # Debounce expensive SVG->pixmap renders on resize
-            self._background_update_timer = QTimer(self)
-            self._background_update_timer.setSingleShot(True)
-            self._background_update_timer.timeout.connect(self._update_background)
-
         # Create invalid input overlay (as child of main window to cover entire window)
         self._error_overlay = QWidget(self)
         self._error_overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -1220,31 +455,38 @@ class MainWindow(QMainWindow):
         # ---- Multi-screen container ----
         self._stack = QStackedWidget()
         self._home_screen = CoolBackground()
-        self._typing_screen = QWidget()
+        self._typing_screen = CoolBackground()
         self._stack.addWidget(self._home_screen)
         self._stack.addWidget(self._typing_screen)
         self.setCentralWidget(self._stack)
 
+        self._about_overlay = AboutOverlay(self._stack)
+        self._about_overlay.hide()
+        self._reset_overlay = ResetConfirmOverlay(self._stack)
+        self._reset_overlay.hide()
+        self._level_completed_overlay = LevelCompletedOverlay(self._stack)
+        self._level_completed_overlay.hide()
+
         # ---- Home screen: Light theme glass UI (like `test.py`) ----
         home_layout = QVBoxLayout(self._home_screen)
-        home_layout.setContentsMargins(36, 28, 36, 28)
-        home_layout.setSpacing(28)
+        home_layout.setContentsMargins(16, 16, 16, 16)
+        home_layout.setSpacing(20)
 
         # Header card
         header = GlassCard()
         header_row = QHBoxLayout(header)
-        header_row.setContentsMargins(28, 20, 28, 20)
+        header_row.setContentsMargins(16, 16, 16, 16)
         header_row.setSpacing(18)
 
         logo = QFrame()
         logo.setFixedSize(60, 60)
         logo.setStyleSheet(
-            f"""
-            QFrame {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {HomeColors.PRIMARY_LIGHT}, stop:1 {HomeColors.PRIMARY});
+            """
+            QFrame {
+                background: transparent;
+                border: none;
                 border-radius: 15px;
-            }}
+            }
             """
         )
         logo_shadow = QGraphicsDropShadowEffect(logo)
@@ -1254,9 +496,16 @@ class MainWindow(QMainWindow):
         logo.setGraphicsEffect(logo_shadow)
         logo_layout = QVBoxLayout(logo)
         logo_layout.setContentsMargins(0, 0, 0, 0)
-        logo_label = QLabel("த")
+        logo_path = Path(__file__).resolve().parent.parent / "assets" / "logo" / "logo.svg"
+        if not logo_path.exists():
+            logo_path = Path(__file__).resolve().parent.parent / "assets" / "logo" / "logo_256.png"
+        logo_label = QLabel()
+        if logo_path.exists():
+            logo_label.setPixmap(QIcon(str(logo_path)).pixmap(QSize(60, 60)))
+        else:
+            logo_label.setText("த")
+            logo_label.setStyleSheet("color: white; font-size: 32px; font-weight: 900;")
         logo_label.setAlignment(Qt.AlignCenter)
-        logo_label.setStyleSheet("color: white; font-size: 32px; font-weight: 900;")
         logo_layout.addWidget(logo_label)
         header_row.addWidget(logo, 0)
 
@@ -1305,17 +554,8 @@ class MainWindow(QMainWindow):
         stats_row.addWidget(self._best_streak_card)
         stats_layout.addLayout(stats_row)
 
-        # Accuracy
-        accuracy_box = QFrame()
-        accuracy_box.setStyleSheet(
-            f"""
-            QFrame {{
-                background: rgba(255, 255, 255, 0.55);
-                border: 1px solid rgba(255, 255, 255, 0.6);
-                border-radius: 14px;
-            }}
-            """
-        )
+        # Accuracy (elevated card like Points/Streak/Best)
+        accuracy_box = GlassCard()
         accuracy_layout = QVBoxLayout(accuracy_box)
         accuracy_layout.setContentsMargins(14, 12, 14, 12)
         accuracy_layout.setSpacing(8)
@@ -1334,9 +574,11 @@ class MainWindow(QMainWindow):
         accuracy_layout.addWidget(self._accuracy_bar)
         stats_layout.addWidget(accuracy_box)
 
-        stats_layout.addStretch(1)
-
-        self.reset_button = QPushButton("↻ மீட்டமை")
+        self.reset_button = QPushButton("மீட்டமை")
+        restart_icon_path = Path(__file__).resolve().parent.parent / "assets" / "icons" / "icon_restart.svg"
+        if restart_icon_path.exists():
+            self.reset_button.setIcon(QIcon(str(restart_icon_path)))
+        self.reset_button.setIconSize(QSize(18, 18))
         self.reset_button.setStyleSheet(
             f"""
             QPushButton {{
@@ -1355,6 +597,36 @@ class MainWindow(QMainWindow):
         )
         self.reset_button.clicked.connect(self._reset_progress)
         stats_layout.addWidget(self.reset_button, 0)
+
+        stats_layout.addStretch(1)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.addStretch(1)
+        about_btn = QPushButton()
+        about_btn.setToolTip("எங்களை பற்றி")
+        about_icon_path = Path(__file__).resolve().parent.parent / "assets" / "icons" / "icon_about.svg"
+        if about_icon_path.exists():
+            about_btn.setIcon(QIcon(str(about_icon_path)))
+        about_btn.setIconSize(QSize(22, 22))
+        about_btn.setFixedSize(44, 44)
+        about_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 {HomeColors.PRIMARY_LIGHT}, stop:1 {HomeColors.PRIMARY});
+                color: white;
+                border: none;
+                border-radius: 14px;
+            }}
+            QPushButton:hover {{ background: {HomeColors.PRIMARY}; }}
+            QPushButton:pressed {{ background: {HomeColors.PRIMARY_DARK}; }}
+            """
+        )
+        about_btn.setCursor(Qt.PointingHandCursor)
+        about_btn.clicked.connect(self._show_about)
+        bottom_row.addWidget(about_btn, 0)
+        stats_layout.addLayout(bottom_row)
 
         content_row.addWidget(stats_panel, 0)
 
@@ -1391,7 +663,7 @@ class MainWindow(QMainWindow):
 
         home_layout.addLayout(content_row, 1)
 
-        footer_tagline = QLabel("செம்மொழித் தமிழ் கற்போம் | தட்டச்சு திறனை வளர்ப்போம்")
+        footer_tagline = QLabel("செம்மொழித் தமிழ் கற்போம்")
         footer_tagline.setAlignment(Qt.AlignCenter)
         footer_tagline.setStyleSheet(
             f"""
@@ -1402,151 +674,219 @@ class MainWindow(QMainWindow):
         )
         home_layout.addWidget(footer_tagline, 0)
 
-        # ---- Typing screen ----
+        # ---- Typing screen (header + left stats + practice area; finger/keyboard unchanged) ----
         typing_layout = QVBoxLayout(self._typing_screen)
-        typing_layout.setContentsMargins(24, 24, 24, 24)
+        typing_layout.setContentsMargins(16, 16, 16, 16)
         typing_layout.setSpacing(20)
 
-        typing_top = QHBoxLayout()
-        typing_top.setSpacing(12)
+        # Header: back + center teal pill (level name) — no extra top/bottom padding, match children height
+        typing_header = QWidget()
+        typing_header.setFixedHeight(48)
+        typing_header.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        header_row = QHBoxLayout(typing_header)
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.setSpacing(12)
         self._back_button = QPushButton("← நிலைகள்")
+        self._back_button.setCursor(Qt.PointingHandCursor)
+        self._back_button.setFixedHeight(48)
         self._back_button.setStyleSheet(f"""
             QPushButton {{
-                background: {colors['bg_container']};
-                color: {colors['text_secondary']};
-                padding: 10px 14px;
-                border: none;
-                border-radius: 10px;
+                border: 1px solid rgba(0,131,143,0.2);
+                border-radius: 12px;
+                color: {HomeColors.PRIMARY};
+                font-size: 14px;
                 font-weight: 600;
-                font-size: 13px;
+                padding: 0 24px;
             }}
-            QPushButton:hover {{
-                background: {colors['bg_hover']};
-            }}
+            QPushButton:hover {{ background: white; border-color: {HomeColors.PRIMARY}; }}
         """)
         self._back_button.clicked.connect(self._show_home_screen)
-        typing_top.addWidget(self._back_button, 0)
-
-        self._typing_title_label = QLabel("")
-        self._typing_title_label.setStyleSheet(f"""
-            color: {colors['text_secondary']};
-            font-size: 14px;
-            font-weight: 600;
-            padding: 0px 4px;
-        """)
-        typing_top.addWidget(self._typing_title_label, 0)
-        typing_top.addStretch(1)
-        typing_layout.addLayout(typing_top)
-
-        task_container = QWidget()
-        task_container.setStyleSheet(f"""
-            QWidget {{
-                background: {colors['bg_container']};
-                border-radius: 16px;
-                padding: 24px;
+        header_row.addWidget(self._back_button, 0)
+        header_row.addStretch(1)
+        level_pill = QFrame()
+        level_pill.setFixedHeight(48)
+        level_pill.setStyleSheet(f"""
+            QFrame {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 {HomeColors.PRIMARY_LIGHT}, stop:1 {HomeColors.PRIMARY});
+                border-radius: 12px;
                 border: none;
             }}
-        """)
-        task_container_layout = QVBoxLayout(task_container)
-        task_container_layout.setContentsMargins(0, 0, 0, 0)
-        task_container_layout.setSpacing(12)
+            """
+        )
+        pill_layout = QHBoxLayout(level_pill)
+        pill_layout.setContentsMargins(20, 0, 20, 0)
+        pill_layout.setSpacing(10)
+        self._typing_title_label = QLabel("")
+        self._typing_title_label.setStyleSheet("color: white; font-size: 15px; font-weight: 800;")
+        pill_layout.addWidget(self._typing_title_label)
+        header_row.addWidget(level_pill, 0)
+        header_row.addStretch(1)
+        typing_layout.addWidget(typing_header, 0)
 
+        # Content row: left stats panel | practice panel
+        typing_content = QHBoxLayout()
+        typing_content.setSpacing(24)
+
+        # Left panel: stats (Time, WPM, Accuracy, Streak, Correct/Incorrect)
+        stats_panel = QWidget()
+        stats_panel.setFixedWidth(280)
+        stats_layout = QVBoxLayout(stats_panel)
+        stats_layout.setContentsMargins(10, 0, 10, 10)
+        stats_layout.setSpacing(14)
+
+        time_card = GlassCard()
+        time_layout = QVBoxLayout(time_card)
+        time_layout.setContentsMargins(20, 16, 20, 16)
+        time_label = QLabel("⏱️ நேரம்")
+        time_label.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 12px;")
+        time_layout.addWidget(time_label)
+        self._typing_time_label = QLabel("0:00")
+        self._typing_time_label.setStyleSheet(f"color: {HomeColors.PRIMARY}; font-size: 36px; font-weight: 900; font-family: monospace;")
+        time_layout.addWidget(self._typing_time_label)
+        stats_layout.addWidget(time_card)
+
+        wpm_card = GlassCard()
+        wpm_layout = QVBoxLayout(wpm_card)
+        wpm_layout.setContentsMargins(20, 16, 20, 16)
+        wpm_label = QLabel("⚡ WPM")
+        wpm_label.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 12px;")
+        wpm_layout.addWidget(wpm_label)
+        self._typing_wpm_label = QLabel("0")
+        self._typing_wpm_label.setStyleSheet(f"color: {HomeColors.PRIMARY}; font-size: 36px; font-weight: 900;")
+        wpm_layout.addWidget(self._typing_wpm_label)
+        wpm_sublabel = QLabel("words per minute")
+        wpm_sublabel.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 11px;")
+        wpm_layout.addWidget(wpm_sublabel)
+        stats_layout.addWidget(wpm_card)
+
+        acc_card = GlassCard()
+        acc_layout = QVBoxLayout(acc_card)
+        acc_layout.setContentsMargins(20, 16, 20, 16)
+        acc_layout.setSpacing(10)
+        acc_header = QHBoxLayout()
+        acc_label = QLabel("🎯 துல்லியம்")
+        acc_label.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 12px;")
+        acc_header.addWidget(acc_label)
+        acc_header.addStretch(1)
+        self._typing_accuracy_value = QLabel("0%")
+        self._typing_accuracy_value.setStyleSheet(f"color: {HomeColors.PRIMARY}; font-size: 18px; font-weight: 900;")
+        acc_header.addWidget(self._typing_accuracy_value)
+        acc_layout.addLayout(acc_header)
+        self._typing_accuracy_bar = HomeProgressBar()
+        self._typing_accuracy_bar.set_progress(0, 100, HomeColors.PRIMARY_LIGHT, HomeColors.PRIMARY)
+        acc_layout.addWidget(self._typing_accuracy_bar)
+        stats_layout.addWidget(acc_card)
+
+        streak_card = GlassCard()
+        streak_layout = QVBoxLayout(streak_card)
+        streak_layout.setContentsMargins(20, 16, 20, 16)
+        streak_label = QLabel("🔥 தொடர்ச்சி")
+        streak_label.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 12px;")
+        streak_layout.addWidget(streak_label)
+        streak_row = QHBoxLayout()
+        self._typing_streak_label = QLabel("0")
+        self._typing_streak_label.setStyleSheet(f"color: {HomeColors.TEXT_PRIMARY}; font-size: 36px; font-weight: 900;")
+        streak_row.addWidget(self._typing_streak_label)
+        self._typing_best_streak_label = QLabel("/ சிறந்தது 0")
+        self._typing_best_streak_label.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 14px;")
+        streak_row.addWidget(self._typing_best_streak_label)
+        streak_row.addStretch(1)
+        streak_layout.addLayout(streak_row)
+        stats_layout.addWidget(streak_card)
+
+        score_card = GlassCard()
+        score_layout = QHBoxLayout(score_card)
+        score_layout.setContentsMargins(20, 16, 20, 16)
+        correct_widget = QWidget()
+        correct_layout = QVBoxLayout(correct_widget)
+        correct_layout.setContentsMargins(0, 0, 0, 0)
+        correct_layout.setAlignment(Qt.AlignCenter)
+        self._typing_correct_label = QLabel("0")
+        self._typing_correct_label.setStyleSheet(f"color: #2e7d32; font-size: 28px; font-weight: 900;")
+        self._typing_correct_label.setAlignment(Qt.AlignCenter)
+        correct_layout.addWidget(self._typing_correct_label)
+        correct_sublabel = QLabel("சரி ✓")
+        correct_sublabel.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 11px;")
+        correct_sublabel.setAlignment(Qt.AlignCenter)
+        correct_layout.addWidget(correct_sublabel)
+        score_layout.addWidget(correct_widget)
+        divider = QFrame()
+        divider.setFixedWidth(1)
+        divider.setStyleSheet("background: rgba(0,0,0,0.1);")
+        score_layout.addWidget(divider)
+        wrong_widget = QWidget()
+        wrong_layout = QVBoxLayout(wrong_widget)
+        wrong_layout.setContentsMargins(0, 0, 0, 0)
+        wrong_layout.setAlignment(Qt.AlignCenter)
+        self._typing_wrong_label = QLabel("0")
+        self._typing_wrong_label.setStyleSheet(f"color: #c62828; font-size: 28px; font-weight: 900;")
+        self._typing_wrong_label.setAlignment(Qt.AlignCenter)
+        wrong_layout.addWidget(self._typing_wrong_label)
+        wrong_sublabel = QLabel("தவறு ✗")
+        wrong_sublabel.setStyleSheet(f"color: {HomeColors.TEXT_MUTED}; font-size: 11px;")
+        wrong_sublabel.setAlignment(Qt.AlignCenter)
+        wrong_layout.addWidget(wrong_sublabel)
+        score_layout.addWidget(wrong_widget)
+        stats_layout.addWidget(score_card)
+        self._typing_stats_panel = stats_panel
+        typing_content.addWidget(stats_panel, 0)
+
+        # Right panel: practice area (letter sequence + hero, then progress at bottom)
+        practice_card = GlassCard()
+        self._typing_practice_card = practice_card
+        practice_layout = QVBoxLayout(practice_card)
+        practice_layout.setContentsMargins(32, 24, 32, 24)
+        practice_layout.setSpacing(20)
+
+        self._letter_sequence_widget = LetterSequenceWidget()
+        practice_layout.addWidget(self._letter_sequence_widget, 0, Qt.AlignCenter)
+
+        self._hero_letter_label = HeroLetterLabel()
+        practice_layout.addWidget(self._hero_letter_label, 0, Qt.AlignCenter)
+
+        self._typing_feedback_label = QLabel("இந்த எழுத்தை தட்டச்சு செய்க")
+        self._typing_feedback_label.setStyleSheet(f"color: {HomeColors.TEXT_SECONDARY}; font-size: 16px; font-weight: 600;")
+        self._typing_feedback_label.setAlignment(Qt.AlignCenter)
+        practice_layout.addWidget(self._typing_feedback_label)
+
+        practice_layout.addStretch(1)
+
+        self.progress_bar = ProgressCard(embedded=True)
+        self.progress_bar.setRange(0, 1)
+        self.progress_bar.setValue(0)
+        practice_layout.addWidget(self.progress_bar)
+
+        # Hidden widgets for focus/key handling (zero height, no visible space)
+        hidden_container = QWidget()
+        hidden_container.setFixedHeight(0)
+        hidden_container.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        hidden_layout = QVBoxLayout(hidden_container)
+        hidden_layout.setContentsMargins(0, 0, 0, 0)
+        hidden_layout.setSpacing(0)
         self.combo_label = QLabel("")
         self.combo_label.setVisible(False)
-
         self.task_display = QLabel()
         self.task_display.setTextFormat(Qt.RichText)
-        self.task_display.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        self.task_display.setStyleSheet(f"""
-            background: {colors['bg_input']};
-            color: {colors['text_primary']};
-            border: none;
-            border-radius: 12px;
-            padding: 24px 28px;
-            font-size: 26px;
-            font-weight: 400;
-            font-family: '{QApplication.font().family()}', sans-serif;
-            min-height: 100px;
-        """)
-        self.task_display.setMinimumHeight(100)
-        task_container_layout.addWidget(self.task_display)
-        typing_layout.addWidget(task_container)
-
-        input_container = QWidget()
-        input_container.setStyleSheet(f"""
-            QWidget {{
-                background: {colors['bg_container']};
-                border-radius: 16px;
-                padding: 24px;
-                border: none;
-            }}
-        """)
-        input_container_layout = QVBoxLayout(input_container)
-        input_container_layout.setContentsMargins(0, 0, 0, 0)
-        input_container_layout.setSpacing(12)
-
+        self.task_display.setVisible(False)
         self.input_box = QLineEdit()
-        self.input_box.setMinimumHeight(100)
-        self.input_box.setStyleSheet(f"""
-            QLineEdit {{
-                background: {colors['bg_input']};
-                color: {colors['text_primary']};
-                border: none;
-                border-radius: 12px;
-                padding: 24px 28px;
-                font-size: 26px;
-                font-weight: 400;
-                font-family: '{QApplication.font().family()}', sans-serif;
-            }}
-            QLineEdit:focus {{
-                border: 2px solid {colors['highlight']};
-                background: {colors['bg_container']};
-            }}
-        """)
+        self.input_box.setFixedHeight(0)
+        self.input_box.setStyleSheet("background: transparent; border: none; color: transparent;")
         self.input_box.installEventFilter(self)
-        self.input_box.setReadOnly(True)  # Prevent text input, we'll handle keys manually
-        input_container_layout.addWidget(self.input_box)
-        typing_layout.addWidget(input_container)
+        self.input_box.setReadOnly(True)
+        hidden_layout.addWidget(self.task_display)
+        hidden_layout.addWidget(self.input_box)
+        practice_layout.addWidget(hidden_container)
 
-        progress_container = QWidget()
-        progress_container.setStyleSheet(f"""
-            QWidget {{
-                background: {colors['bg_container']};
-                border-radius: 12px;
-                padding: 16px;
-                border: none;
-            }}
-        """)
-        progress_layout = QVBoxLayout(progress_container)
-        progress_layout.setSpacing(10)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setStyleSheet(f"""
-            QProgressBar {{
-                border: none;
-                border-radius: 8px;
-                text-align: center;
-                background: {colors['bg_card']};
-                height: 24px;
-                font-weight: 500;
-                font-size: 12px;
-                color: {colors['text_muted']};
-            }}
-            QProgressBar::chunk {{
-                background: {colors['progress']};
-                border-radius: 7px;
-            }}
-        """)
-        progress_layout.addWidget(self.progress_bar)
-        typing_layout.addWidget(progress_container)
+        typing_content.addWidget(practice_card, 1)
+        typing_layout.addLayout(typing_content, 1)
 
         # Single parent container for Finger UI and Keyboard (typing screen only)
         self._bottom_container = QWidget()
-        self._bottom_container.setStyleSheet(f"""
+        self._bottom_container.setStyleSheet("""
             background: transparent;
             border-radius: 16px;
-            padding: 20px;
+            padding: 16px;
         """)
         bottom_row = QHBoxLayout(self._bottom_container)
         bottom_row.setSpacing(15)
@@ -1609,8 +949,6 @@ class MainWindow(QMainWindow):
         # Start on home screen
         self._stack.setCurrentWidget(self._home_screen)
 
-        # Update background after window is set up
-        self._update_background()
         self._update_error_overlay_geometry()
 
         self.start_shortcut = QShortcut(Qt.CTRL | Qt.Key_Return, self)
@@ -1624,6 +962,9 @@ class MainWindow(QMainWindow):
             self._header_timer = QTimer(self)
             self._header_timer.timeout.connect(self._update_header_datetime)
             self._header_timer.start(1000)
+
+        self._typing_stats_timer = QTimer(self)
+        self._typing_stats_timer.timeout.connect(self._update_typing_stats_panel)
 
     def _update_header_datetime(self) -> None:
         if self._header_datetime_label is None:
@@ -1690,6 +1031,7 @@ class MainWindow(QMainWindow):
                 task_count = len(state.level.tasks)
                 title = name_map.get(level_id, state.level.name)
                 icon = icon_map.get(level_id, title[:1] if title else "•")
+                completed = state.completed >= task_count and task_count > 0
                 card = HomeLevelRowCard(
                     level_key=state.level.key,
                     level_id=level_id,
@@ -1699,15 +1041,17 @@ class MainWindow(QMainWindow):
                     total=int(task_count),
                     unlocked=bool(state.unlocked),
                     selected=bool(state.is_current),
+                    completed=completed,
                     on_click=self._start_level,
+                    on_restart=self._restart_level,
+                    on_view=self._view_level,
                 )
                 self._home_levels_layout.addWidget(card)
 
             self._home_levels_layout.addStretch(1)
 
-        # Keep left panel accuracy in sync with stored best (home screen)
-        if self._session is None:
-            self._set_home_accuracy(self._aggregate_best_accuracy())
+        # Keep left panel and gamification cards in sync with stored progress (home screen)
+        self._update_gamification_stats()
 
     def _build_level_states(self) -> list[LevelState]:
         levels = self._levels_repo.all()
@@ -1728,7 +1072,17 @@ class MainWindow(QMainWindow):
                     break
         return states
 
-    def _start_level(self, level_key: str) -> None:
+    def _restart_level(self, level_key: str) -> None:
+        """Clear progress for the level and start it from the beginning."""
+        self._progress_store.reset_level(level_key)
+        self._start_level(level_key, view_only=False)
+
+    def _view_level(self, level_key: str) -> None:
+        """Open a completed level in view-only mode (no timer, no typing)."""
+        self._start_level(level_key, view_only=True)
+
+    def _start_level(self, level_key: str, view_only: bool = False) -> None:
+        self._view_only_session = view_only
         level = self._levels_repo.get(level_key)
         progress = self._progress_store.get_level_progress(level_key)
         task_count = len(level.tasks)
@@ -1746,21 +1100,19 @@ class MainWindow(QMainWindow):
         self._start_session(level, progress.completed)
         if self._typing_title_label is not None:
             self._typing_title_label.setText(level.name)
+        if self._typing_feedback_label is not None:
+            if view_only:
+                self._typing_feedback_label.setText("பார்வை மட்டும் — தட்டச்சு செய்ய முடியாது")
+            else:
+                self._typing_feedback_label.setText("இந்த எழுத்தை தட்டச்சு செய்க")
         self._show_typing_screen()
-
-    def _on_level_selected(self) -> None:
-        if not (hasattr(self, "levels_list") and getattr(self, "levels_list") is not None):
-            return
-        items = self.levels_list.selectedItems()
-        if not items:
-            return
-        level_key = items[0].data(Qt.UserRole)
-        self._start_level(level_key)
 
     def _show_home_screen(self) -> None:
         if self._stack is None or self._home_screen is None:
             return
         self._stack.setCurrentWidget(self._home_screen)
+        if self._typing_stats_timer is not None:
+            self._typing_stats_timer.stop()
         if self._finger_guidance_label is not None:
             self._finger_guidance_label.setVisible(False)
         self._clear_keyboard_highlight()
@@ -1771,8 +1123,25 @@ class MainWindow(QMainWindow):
         if self._stack is None or self._typing_screen is None:
             return
         self._stack.setCurrentWidget(self._typing_screen)
+        QTimer.singleShot(0, self._sync_typing_panel_heights)
+        QTimer.singleShot(50, self._sync_typing_panel_heights)
         if hasattr(self, "input_box") and self.input_box is not None:
             self.input_box.setFocus()
+        self._update_typing_stats_panel()
+        if not self._view_only_session and self._typing_stats_timer is not None:
+            self._typing_stats_timer.start(1000)
+
+    def _sync_typing_panel_heights(self) -> None:
+        """Match tutor area height to stats area, reduced by 40px so tutor is slightly shorter."""
+        if not hasattr(self, "_typing_stats_panel") or not hasattr(self, "_typing_practice_card"):
+            return
+        stats = self._typing_stats_panel
+        practice = self._typing_practice_card
+        if stats is None or practice is None:
+            return
+        h = stats.height()
+        if h > 0:
+            practice.setMaximumHeight(max(200, h - 40))
 
     def _start_session(self, level: Level, start_index: int) -> None:
         task_count = len(level.tasks)
@@ -1885,8 +1254,9 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event) -> None:
         """Handle window resize to adjust keyboard and finger UI"""
         super().resizeEvent(event)
-        self._schedule_background_update()
         self._update_error_overlay_geometry()
+        if self._stack is not None and self._stack.currentWidget() is self._typing_screen:
+            QTimer.singleShot(0, self._sync_typing_panel_heights)
         QTimer.singleShot(10, self._adjust_adaptive_layout)  # Delay to ensure size is updated
     
     def _adjust_adaptive_layout(self) -> None:
@@ -1995,7 +1365,9 @@ class MainWindow(QMainWindow):
         """Handle individual key press events"""
         if not self._session:
             return False
-        
+        if self._view_only_session:
+            return True
+
         key = event.key()
         text = event.text()
         
@@ -2049,7 +1421,8 @@ class MainWindow(QMainWindow):
         else:
             self._input_has_error = True
             self._set_input_error_state(True)
-            self._update_display_from_keystrokes()
+            if self.task_display is not None:
+                self.task_display.setText("")
             self._flash_invalid_input_overlay()
         
         self._update_keyboard_hint()
@@ -2210,9 +1583,9 @@ class MainWindow(QMainWindow):
     
     def _submit_task_from_keystrokes(self) -> None:
         """Submit task when all keystrokes are completed"""
-        if not self._session:
+        if not self._session or self._session.is_complete():
             return
-        
+
         typed = self._typed_tamil_text if self._typed_tamil_text else self._current_task_text
         self._submit_task(typed)
         
@@ -2223,15 +1596,13 @@ class MainWindow(QMainWindow):
     
     def _update_stats_from_tracker(self) -> None:
         """Update UI stats from keystroke tracker"""
-        summary = self._keystroke_tracker.get_session_summary()
+        self._keystroke_tracker.get_session_summary()
         self._update_gamification_stats()
-    
-    def _on_input_changed(self, text: str) -> None:
-        """Legacy method - no longer used but kept for compatibility"""
-        pass
 
     def _submit_task(self, typed: Optional[str] = None) -> None:
         if not self._session or not self._current_level:
+            return
+        if self._session.is_complete():
             return
         if typed is None:
             typed = self.input_box.text()
@@ -2272,7 +1643,12 @@ class MainWindow(QMainWindow):
             self._combo_multiplier = 1.5
         else:
             self._combo_multiplier = 1.0
-        
+
+        self._progress_store.update_gamification(
+            self._total_score,
+            self._current_streak,
+            self._best_streak,
+        )
         self._update_gamification_stats()
     
     def _update_gamification_stats(self) -> None:
@@ -2290,25 +1666,95 @@ class MainWindow(QMainWindow):
         else:
             self._set_home_accuracy(self._aggregate_best_accuracy())
 
+        self._update_typing_stats_panel()
         if hasattr(self, "combo_label") and self.combo_label is not None:
             self.combo_label.setVisible(False)
 
+    def _update_typing_stats_panel(self) -> None:
+        """Update typing screen left panel: time, WPM, accuracy, streak, correct/wrong, progress text."""
+        if self._session is None:
+            return
+        elapsed = int(time.time() - self._session.start_time)
+        m, s = divmod(elapsed, 60)
+        time_str = f"{m}:{s:02d}"
+        if self._typing_time_label is not None:
+            self._typing_time_label.setText(time_str)
+        wpm = self._session.aggregate_wpm()
+        if self._typing_wpm_label is not None:
+            self._typing_wpm_label.setText(f"{int(wpm)}")
+        acc = self._session.aggregate_accuracy()
+        if self._typing_accuracy_value is not None:
+            self._typing_accuracy_value.setText(f"{int(round(acc))}%")
+        if self._typing_accuracy_bar is not None:
+            self._typing_accuracy_bar.set_progress(int(round(acc)), 100, HomeColors.PRIMARY_LIGHT, HomeColors.PRIMARY)
+        if self._typing_streak_label is not None:
+            self._typing_streak_label.setText(f"{self._current_streak}")
+        if self._typing_best_streak_label is not None:
+            self._typing_best_streak_label.setText(f"/ சிறந்தது {self._best_streak}")
+        if self._typing_correct_label is not None:
+            self._typing_correct_label.setText(f"{self._session.total_correct}")
+        if self._typing_wrong_label is not None:
+            self._typing_wrong_label.setText(f"{self._session.aggregate_errors()}")
+        task_count = self._session.total_tasks
+        idx = self._session.index
+        pct = round((idx / task_count) * 100) if task_count else 0
+        self.progress_bar.setValue(idx)
+
     def _level_completed(self) -> None:
+        if self._typing_stats_timer is not None:
+            self._typing_stats_timer.stop()
         self.task_display.setText("நிலை முடிந்தது! அடுத்த நிலையைத் தேர்வு செய்யவும்.")
         self._set_input_text("")
-        QMessageBox.information(self, "நிலை முடிந்தது", "இந்த நிலையை நீங்கள் முடித்துவிட்டீர்கள்!")
+        overlay = self._level_completed_overlay
+        overlay.setGeometry(self._stack.rect())
+        overlay.raise_()
+        overlay.show()
+        loop = QEventLoop()
+        overlay.closed.connect(loop.quit)
+        loop.exec()
+        overlay.closed.disconnect(loop.quit)
         self._refresh_levels_list()
         self._clear_keyboard_highlight()
 
     def _reset_progress(self) -> None:
-        confirm = QMessageBox.question(
-            self,
-            "முன்னேற்றத்தை மீட்டமை",
-            "அனைத்து முன்னேற்றத்தையும் மீட்டமைக்க வேண்டுமா?",
-        )
-        if confirm == QMessageBox.Yes:
+        overlay = self._reset_overlay
+        overlay.setGeometry(self._stack.rect())
+        overlay.raise_()
+        overlay.show()
+        confirmed = [False]
+
+        def on_closed(ok: bool) -> None:
+            confirmed[0] = ok
+            loop.quit()
+
+        loop = QEventLoop()
+        overlay.closed.connect(on_closed)
+        loop.exec()
+        overlay.closed.disconnect(on_closed)
+
+        if confirmed[0]:
             self._progress_store.reset()
+            self._total_score = 0
+            self._current_streak = 0
+            self._best_streak = 0
+            self._update_gamification_stats()
             self._refresh_levels_list()
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Persist progress when closing the app."""
+        if self._progress_store is not None:
+            self._progress_store.save()
+        super().closeEvent(event)
+
+    def _show_about(self) -> None:
+        overlay = self._about_overlay
+        overlay.setGeometry(self._stack.rect())
+        overlay.raise_()
+        overlay.show()
+        loop = QEventLoop()
+        overlay.closed.connect(loop.quit)
+        loop.exec()
+        overlay.closed.disconnect(loop.quit)
 
     def _build_keyboard(self) -> QWidget:
         container = QWidget()
@@ -2580,10 +2026,10 @@ class MainWindow(QMainWindow):
                 self._finger_guidance_label.setVisible(True)
         else:
             # Task is complete - highlight space bar to indicate user should press space for next task
+            colors = self._get_theme_colors()
             self._clear_keyboard_highlight()
             if "Space" in self._key_labels:
                 space_label = self._key_labels["Space"]
-                colors = self._get_theme_colors()
                 font_px = self._keyboard_font_sizes.get('special', 18)
                 border_color = self._highlight_border_color_for_key("Space")
                 space_label.setStyleSheet(f"""
@@ -2794,9 +2240,29 @@ class MainWindow(QMainWindow):
     def _render_task_display(self, typed: str, target: str, is_error: bool) -> None:
         if not target:
             self.task_display.setText("")
+            if self._letter_sequence_widget is not None:
+                self._letter_sequence_widget.set_letters([])
+                self._letter_sequence_widget.set_current(0)
+            if self._hero_letter_label is not None:
+                self._hero_letter_label.setText("")
             return
 
         colors = self._get_theme_colors()
+
+        # Update letter sequence and hero (practice UI)
+        letters = list(target)
+        match_len = 0
+        for i in range(min(len(typed or ""), len(target))):
+            if i < len(typed) and i < len(target) and typed[i] == target[i]:
+                match_len = i + 1
+            else:
+                break
+        if self._letter_sequence_widget is not None:
+            self._letter_sequence_widget.set_letters(letters)
+            self._letter_sequence_widget.set_current(match_len)
+        if self._hero_letter_label is not None:
+            current_char = target[match_len] if match_len < len(target) else ""
+            self._hero_letter_label.setText(current_char)
         
         if typed and typed == target:
             completed = html.escape(target)
@@ -2911,59 +2377,3 @@ class MainWindow(QMainWindow):
 
         self.task_display.setMinimumHeight(int(task_size * 2.2))
         self.input_box.setMinimumHeight(int(input_size * 2.2))
-    
-    def _update_background(self) -> None:
-        """Update the background SVG to fit the window size, preserving aspect ratio."""
-        if not self._background_label or not self._background_svg_renderer:
-            return
-
-        size = self.size()
-        if size.width() <= 0 or size.height() <= 0:
-            return
-
-        dpr = self.devicePixelRatioF()
-        render_key = (size.width(), size.height(), dpr)
-
-        if self._background_last_render_key == render_key:
-            return
-
-        pixmap = QPixmap(size * dpr)
-        pixmap.setDevicePixelRatio(dpr)
-        pixmap.fill(Qt.transparent)
-
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        svg_size = self._background_svg_renderer.defaultSize()
-        if svg_size.width() > 0 and svg_size.height() > 0:
-            win_size = size
-            scale_x = win_size.width() / svg_size.width()
-            scale_y = win_size.height() / svg_size.height()
-            
-            scale = max(scale_x, scale_y)
-
-            scaled_width = svg_size.width() * scale
-            scaled_height = svg_size.height() * scale
-            
-            x = (win_size.width() - scaled_width) / 2
-            y = (win_size.height() - scaled_height) / 2
-            
-            target_rect = QRectF(x, y, scaled_width, scaled_height)
-            self._background_svg_renderer.render(painter, target_rect)
-
-        painter.end()
-
-        self._background_label.setPixmap(pixmap)
-        self._background_label.setGeometry(0, 0, size.width(), size.height())
-        self._background_last_render_key = render_key
-
-    def _schedule_background_update(self, debounce_ms: int = 50) -> None:
-        """Debounce background renders during interactive resize."""
-        if not self._background_label or not self._background_svg_renderer:
-            return
-        if self._background_update_timer is None:
-            self._update_background()
-            return
-        # Restart timer (cancels previous pending update)
-        self._background_update_timer.stop()
-        self._background_update_timer.start(max(0, int(debounce_ms)))
