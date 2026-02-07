@@ -9,10 +9,11 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-from PySide6.QtCore import Qt, QDateTime, QPoint, QPointF, QTimer, QSize, QPropertyAnimation, QRectF, Signal, QEventLoop, QEvent
+from PySide6.QtCore import Qt, QDateTime, QPoint, QPointF, QTimer, QSize, QPropertyAnimation, QRectF, Signal, QEventLoop, QEvent, QUrl
 from PySide6.QtGui import (
     QBrush,
     QColor,
+    QDesktopServices,
     QFont,
     QGuiApplication,
     QIcon,
@@ -391,7 +392,7 @@ class AboutKaniyamDialog(QDialog):
         main_layout.setColumnStretch(0, 1)
 
         overlay = QWidget(self)
-        overlay.setStyleSheet("background: rgba(0, 0, 0, 0.2);")
+        overlay.setStyleSheet("background: rgba(0, 0, 0, 0.4);")
         overlay.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         overlay.setCursor(Qt.CursorShape.ArrowCursor)
         overlay.setMinimumSize(1, 1)
@@ -434,6 +435,53 @@ class AboutKaniyamDialog(QDialog):
         body.setAlignment(Qt.AlignCenter)
         layout.addWidget(body)
 
+        about_html = (
+            "<b>Author:</b> Khaleel Jageer<br>"
+            "<b>Email:</b> jskcse4@gmail.com<br>"
+            "<b>Organization:</b> Kaniyam Foundation<br>"
+            "<b>Version:</b> 1.0.0<br>"
+            "<b>Project Repository:</b> "
+            '<a href="https://github.com/khaleeljageer/ezhuthaali">https://github.com/khaleeljageer/ezhuthaali</a><br>'
+            "<br><b>Thanks to:</b><br>"
+            'PySide6 (<a href="https://wiki.qt.io/PySide2">https://wiki.qt.io/PySide2</a>)<br>'
+            "This project is licensed under "
+            '<a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL v3</a>.'
+        )
+        info_label = QLabel(about_html)
+        info_label.setWordWrap(True)
+        info_label.setTextFormat(Qt.TextFormat.RichText)
+        info_label.setOpenExternalLinks(True)
+        info_label.setStyleSheet(
+            f"color: {HomeColors.TEXT_PRIMARY}; font-size: 13px; line-height: 1.5;"
+        )
+        info_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(info_label)
+
+        report_issue_url = "https://github.com/khaleeljageer/ezhuthaali/issues/new"
+        bug_icon_path = Path(__file__).resolve().parent.parent / "assets" / "icons" / "icon_bug.svg"
+        report_btn = QPushButton("Report Issue")
+        if bug_icon_path.exists():
+            report_btn.setIcon(QIcon(str(bug_icon_path)))
+        report_btn.setIconSize(QSize(18, 18))
+        report_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: transparent;
+                color: {HomeColors.PRIMARY};
+                padding: 10px 20px;
+                border: 2px solid {HomeColors.PRIMARY};
+                border-radius: 12px;
+                font-weight: 600;
+                font-size: 13px;
+            }}
+            QPushButton:hover {{ background: rgba(0, 131, 143, 0.1); }}
+            """
+        )
+        report_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        report_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        report_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(report_issue_url)))
+        layout.addWidget(report_btn)
+
         close_btn = QPushButton("மூடு")
         close_btn.setStyleSheet(
             f"""
@@ -450,9 +498,10 @@ class AboutKaniyamDialog(QDialog):
             QPushButton:hover {{ background: {HomeColors.PRIMARY}; }}
             """
         )
-        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn, 0, Qt.AlignCenter)
+        layout.addWidget(close_btn)
 
 
 class AboutOverlay(QWidget):
@@ -500,24 +549,59 @@ class AboutOverlay(QWidget):
         layout.setContentsMargins(28, 28, 28, 28)
         main_layout.addWidget(container, 0, 0, 1, 1, Qt.AlignCenter)
 
-        title = QLabel("Kaniyam Foundation")
+        title = QLabel("About Ezhuthaali")
         title.setStyleSheet(
             f"color: {HomeColors.PRIMARY}; font-size: 22px; font-weight: 900;"
         )
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        body = QLabel(
-            "கணியம் அறக்கட்டளை தமிழ் மொழி மற்றும் தொழில்நுட்பத்தை இணைக்கும் "
-            "திட்டங்களை ஊக்குவிக்கிறது. எழுத்தாளி தமிழ் தட்டச்சு கற்றலை எளிமையாக்கும் "
-            "ஒரு சாதனம்."
+        about_html = (
+            "<b>Author:</b> Khaleel Jageer<br>"
+            "<b>Email:</b> jskcse4@gmail.com<br>"
+            '<b>Organization:</b> <a href="https://www.kaniyam.com">Kaniyam Foundation</a><br>'
+            "<b>Version:</b> 1.0.0<br>"
+            "<b>Project Repository:</b> "
+            '<a href="https://github.com/khaleeljageer/ezhuthaali">https://github.com/khaleeljageer/ezhuthaali</a><br>'
+            "<br><b>Thanks to:</b><br>"
+            'PySide6 (<a href="https://wiki.qt.io/PySide2">https://wiki.qt.io/PySide2</a>)<br>'
+            "This project is licensed under "
+            '<a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL v3</a>.'
         )
-        body.setWordWrap(True)
-        body.setStyleSheet(
-            f"color: {HomeColors.TEXT_PRIMARY}; font-size: 14px; font-weight: 500; line-height: 1.5;"
+        info_label = QLabel(about_html)
+        info_label.setWordWrap(True)
+        info_label.setTextFormat(Qt.TextFormat.RichText)
+        info_label.setOpenExternalLinks(True)
+        info_label.setStyleSheet(
+            f"color: {HomeColors.TEXT_PRIMARY}; font-size: 13px; line-height: 1.5;"
         )
-        body.setAlignment(Qt.AlignCenter)
-        layout.addWidget(body)
+        info_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(info_label)
+
+        report_issue_url = "https://github.com/khaleeljageer/ezhuthaali/issues/new"
+        bug_icon_path = Path(__file__).resolve().parent.parent / "assets" / "icons" / "icon_bug.svg"
+        report_btn = QPushButton("Report Issue")
+        if bug_icon_path.exists():
+            report_btn.setIcon(QIcon(str(bug_icon_path)))
+        report_btn.setIconSize(QSize(18, 18))
+        report_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: transparent;
+                color: {HomeColors.PRIMARY};
+                padding: 10px 20px;
+                border: 2px solid {HomeColors.PRIMARY};
+                border-radius: 12px;
+                font-weight: 600;
+                font-size: 13px;
+            }}
+            QPushButton:hover {{ background: rgba(0, 131, 143, 0.1); }}
+            """
+        )
+        report_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        report_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        report_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(report_issue_url)))
+        layout.addWidget(report_btn)
 
         close_btn = QPushButton("மூடு")
         close_btn.setStyleSheet(
@@ -535,9 +619,10 @@ class AboutOverlay(QWidget):
             QPushButton:hover {{ background: {HomeColors.PRIMARY}; }}
             """
         )
-        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         close_btn.clicked.connect(lambda: (self.hide(), self.closed.emit()))
-        layout.addWidget(close_btn, 0, Qt.AlignCenter)
+        layout.addWidget(close_btn)
 
     def _update_geometry(self) -> None:
         parent = self.parentWidget()
