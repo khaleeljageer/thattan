@@ -6,7 +6,7 @@
 #   pip install -r requirements.txt
 #   pip install pyinstaller
 # Then run: ./build_appimage.sh
-# Output: Thattan-x86_64.AppImage (run with: ./Thattan-x86_64.AppImage)
+# Output: release/Thattan-x86_64.AppImage
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,10 +16,12 @@ APP_NAME="Thattan"
 ARCH="x86_64"
 # New appimagetool repo (AppImageKit is obsolete)
 APPIMAGE_TOOL_URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${ARCH}.AppImage"
-OUTPUT_APPIMAGE="${APP_NAME}-${ARCH}.AppImage"
+RELEASE_DIR="release"
+OUTPUT_APPIMAGE="${RELEASE_DIR}/${APP_NAME}-${ARCH}.AppImage"
 
 echo "==> Cleaning previous build..."
 rm -rf build dist "AppDir"
+mkdir -p "$RELEASE_DIR"
 mkdir -p AppDir
 
 echo "==> Building with PyInstaller (one-dir for AppImage)..."
@@ -86,4 +88,3 @@ export ARCH=x86_64
 echo ""
 echo "==> Done: $OUTPUT_APPIMAGE"
 echo "    Run: ./$OUTPUT_APPIMAGE"
-echo "    Or make executable and run: chmod +x $OUTPUT_APPIMAGE && ./$OUTPUT_APPIMAGE"
