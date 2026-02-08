@@ -247,7 +247,7 @@ class ProgressCard(QFrame):
         self._bar = HomeProgressBar(
             self,
             track_color=HomeColors.PROGRESS_TRACK,
-            show_percentage=True,
+            show_percentage=False,
             height=14,
         )
         self._bar.set_progress(0, 1, HomeColors.PROGRESS_FILL, HomeColors.PROGRESS_FILL)

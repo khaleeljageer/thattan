@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Thattan (Ezhuthaali) as a portable AppImage.
+# Build Thattan as a portable AppImage.
 # Run from project root: ./build_appimage.sh
 #
 # Prerequisites (from project root):

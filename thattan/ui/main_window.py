@@ -110,7 +110,6 @@ class MainWindow(QMainWindow):
         self._typing_screen: Optional[QWidget] = None
         self._back_button: Optional[QPushButton] = None
         self._typing_title_label: Optional[QLabel] = None
-        self._typing_level_title_label: Optional[QLabel] = None
 
         # Typing screen: practice UI (letter sequence, hero, stats panel)
         self._letter_sequence_widget: Optional[LetterSequenceWidget] = None
@@ -723,13 +722,6 @@ class MainWindow(QMainWindow):
         pill_layout.addWidget(self._typing_title_label)
         header_row.addWidget(level_pill, 0)
         header_row.addStretch(1)
-        # Title (level name) as separate label at the right end
-        self._typing_level_title_label = QLabel("")
-        self._typing_level_title_label.setStyleSheet(
-            f"color: {HomeColors.TEXT_PRIMARY}; font-size: 15px; font-weight: 700;"
-        )
-        self._typing_level_title_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        header_row.addWidget(self._typing_level_title_label, 0)
         typing_layout.addWidget(typing_header, 0)
 
         # Content row: left stats panel | practice panel
@@ -1108,9 +1100,7 @@ class MainWindow(QMainWindow):
         self._start_session(level, progress.completed)
         if self._typing_title_label is not None:
             level_id = re.sub(r"^level", "", level.key)
-            self._typing_title_label.setText(f"நிலை {level_id}")
-        if self._typing_level_title_label is not None:
-            self._typing_level_title_label.setText(level.name)
+            self._typing_title_label.setText(f"நிலை {level_id}: {level.name}")
         if self._typing_feedback_label is not None:
             if view_only:
                 self._typing_feedback_label.setText("பார்வை மட்டும் — தட்டச்சு செய்ய முடியாது")
