@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from thattan.ui.colors import HomeColors, blend_hex
 
 

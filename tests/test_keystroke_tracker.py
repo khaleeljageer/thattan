@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from datetime import datetime, timedelta
-from unittest.mock import patch
-
-import pytest
+from datetime import datetime
 
 from thattan.core.keystroke_tracker import (
     KeystrokeTracker,
