@@ -1,1 +1,0 @@
-release/Thattan-x86_64.AppImage filter=lfs diff=lfs merge=lfs -text

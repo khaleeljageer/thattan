@@ -37,6 +37,7 @@ MANIFEST
 AppDir/
 appimagetool*.AppImage
 appimageupdatetool*.AppImage
+release/
 
 # Installer logs
 pip-log.txt
