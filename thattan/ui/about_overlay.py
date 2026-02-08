@@ -231,7 +231,7 @@ class AboutOverlay(QWidget):
         link_row = QHBoxLayout()
         link_row.setSpacing(10)
         for text, url, symbol in [
-            ("GitHub", "https://github.com/khaleeljageer/ezhuthaali", "💻"),
+            ("GitHub", "https://github.com/khaleeljageer/thattan", "💻"),
             ("Website", "https://www.kaniyam.com", "🌐"),
         ]:
             card = QPushButton(f"  {symbol}  {text}")
@@ -278,7 +278,7 @@ class AboutOverlay(QWidget):
         # Buttons: Report Issue (left), Close (right)
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
-        report_issue_url = "https://github.com/khaleeljageer/ezhuthaali/issues/new"
+        report_issue_url = "https://github.com/khaleeljageer/thattan/issues/new"
         bug_icon_path = _assets_dir / "icons" / "icon_bug.svg"
         report_btn = QPushButton("Report Issue")
         if bug_icon_path.exists():

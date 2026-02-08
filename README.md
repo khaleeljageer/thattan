@@ -15,7 +15,7 @@ A Tamil99 typing practice application built with Python + PySide6. Designed as a
 - **Accuracy**: Percentage calculation
 - **Speed (WPM/SPM)**: Words per minute and strokes per minute
 - **Error Tracking**: Monitoring of incorrect keystrokes
-- **Progress Saving**: User progress is automatically saved (`~/.ezhuthaali/progress.json`)
+- **Progress Saving**: User progress is automatically saved (`~/.thattan/progress.json`)
 
 ### 🎨 User Interface
 - **Light Theme**: Modern, clean light theme
@@ -36,8 +36,8 @@ A Tamil99 typing practice application built with Python + PySide6. Designed as a
 
 ```bash
 # 1. Clone the repository
-git clone <repository-url>
-cd ezhuthaali
+git clone https://github.com/khaleeljageer/thattan.git
+cd thattan
 
 # 2. Create virtual environment
 python -m venv .venv
@@ -51,8 +51,8 @@ source .venv/bin/activate
 # 4. Install dependencies
 pip install -r requirements.txt
 
-# 5. Run the application
-python app.py
+# 5. Run the application (from project root)
+python -m thattan
 ```
 
 ## Usage
@@ -75,17 +75,17 @@ python app.py
 ## Data Files
 
 ### Practice Levels
-Practice lines are located in the `ezhuthaali/data/levels/` directory:
-- `level0.txt` - Level 0
-- `level1.txt` - Level 1
-- `level2.txt` - Level 2
-- `level3.txt` - Level 3
-- `level4.txt` - Level 4
+Practice lines are located in the `thattan/data/levels/` directory:
+- `level0.yaml` - Level 0
+- `level1.yaml` - Level 1
+- `level2.yaml` - Level 2
+- `level3.yaml` - Level 3
+- `level4.yaml` - Level 4
 
-Each line in a file = one practice task. The number of lines in the file determines the task count for that level.
+Each level YAML has a `title` and `content` (list of tasks). The number of items in `content` determines the task count for that level.
 
 ### Progress Storage
-User progress is saved in the `~/.ezhuthaali/progress.json` file.
+User progress is saved in the `~/.thattan/progress.json` file.
 
 ## Tamil99 Keyboard
 
@@ -104,19 +104,32 @@ This application uses the Tamil99 keyboard layout. All key mappings are embedded
 
 ### Structure
 ```
-ezhuthaali/
-├── app.py                 # Application entry point
-├── ezhuthaali/
+thattan/                        # ← repo root (git clone creates this)
+├── thattan/                    # Python package
+│   ├── __main__.py             # python -m thattan entry point
+│   ├── app.py                  # Application setup
 │   ├── core/
-│   │   ├── levels.py      # Level management
-│   │   ├── progress.py    # Progress storage
-│   │   ├── session.py     # Typing session
+│   │   ├── levels.py           # Level loading from YAML
+│   │   ├── progress.py         # Progress storage
+│   │   ├── session.py          # Typing session logic
 │   │   └── keystroke_tracker.py  # Keystroke tracking
 │   ├── ui/
-│   │   └── main_window.py # Main UI
-│   └── data/
-│       └── levels/        # Practice level files
-└── requirements.txt
+│   │   ├── main_window.py      # Main window & screen management
+│   │   ├── colors.py           # Theme colors & utilities
+│   │   ├── models.py           # UI data models
+│   │   ├── home_widgets.py     # Home screen widgets
+│   │   ├── level_cards.py      # Level selection cards
+│   │   ├── typing_widgets.py   # Typing practice widgets
+│   │   ├── about_overlay.py    # About dialog
+│   │   └── custom_overlay.py   # Custom overlay widgets
+│   ├── data/
+│   │   └── levels/             # Practice level YAML files
+│   └── assets/                 # Fonts, images, SVGs
+├── tests/                      # Unit tests
+├── requirements.txt
+├── build_appimage.sh           # AppImage build script
+├── thattan.spec                # PyInstaller spec
+└── README.md
 ```
 
 ## License

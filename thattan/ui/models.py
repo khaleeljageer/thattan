@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ezhuthaali.core.levels import Level
+from thattan.core.levels import Level
 
 
 @dataclass

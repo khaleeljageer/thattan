@@ -22,10 +22,10 @@ def _default_gamification() -> Dict[str, int]:
 
 class ProgressStore:
     """Stores level and gamification progress. Persists to disk across app restarts.
-    File: ~/.ezhuthaali/progress.json. Cleared only when user presses reset progress."""
+    File: ~/.thattan/progress.json. Cleared only when user presses reset progress."""
 
     def __init__(self) -> None:
-        self._file_path = Path.home() / ".ezhuthaali" / "progress.json"
+        self._file_path = Path.home() / ".thattan" / "progress.json"
         self._file_path.parent.mkdir(parents=True, exist_ok=True)
         self._progress, self._gamification = self._load()
 

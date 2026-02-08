@@ -5,9 +5,9 @@ from pathlib import Path
 from PySide6.QtGui import QGuiApplication, QFontDatabase, QFont, QIcon
 from PySide6.QtWidgets import QApplication
 
-from ezhuthaali.core.progress import ProgressStore
-from ezhuthaali.core.levels import LevelRepository
-from ezhuthaali.ui.main_window import MainWindow
+from thattan.core.progress import ProgressStore
+from thattan.core.levels import LevelRepository
+from thattan.ui.main_window import MainWindow
 
 
 def configure_logging() -> None:

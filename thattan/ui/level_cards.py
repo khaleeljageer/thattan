@@ -22,8 +22,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ezhuthaali.ui.colors import blend_hex
-from ezhuthaali.ui.models import LevelState
+from thattan.ui.colors import blend_hex
+from thattan.ui.models import LevelState
 
 
 class LevelCard(QWidget):

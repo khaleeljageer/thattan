@@ -37,14 +37,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ezhuthaali.core.levels import LevelRepository, Level
-from ezhuthaali.core.progress import ProgressStore
-from ezhuthaali.core.session import TypingSession, TaskResult
-from ezhuthaali.core.keystroke_tracker import KeystrokeTracker, Tamil99KeyboardLayout
-from ezhuthaali.ui.about_overlay import AboutOverlay
-from ezhuthaali.ui.colors import HomeColors
-from ezhuthaali.ui.custom_overlay import ResetConfirmOverlay, LevelCompletedOverlay
-from ezhuthaali.ui.home_widgets import (
+from thattan.core.levels import LevelRepository, Level
+from thattan.core.progress import ProgressStore
+from thattan.core.session import TypingSession, TaskResult
+from thattan.core.keystroke_tracker import KeystrokeTracker, Tamil99KeyboardLayout
+from thattan.ui.about_overlay import AboutOverlay
+from thattan.ui.colors import HomeColors
+from thattan.ui.custom_overlay import ResetConfirmOverlay, LevelCompletedOverlay
+from thattan.ui.home_widgets import (
     AspectRatioWidget,
     CoolBackground,
     GlassCard,
@@ -53,9 +53,9 @@ from ezhuthaali.ui.home_widgets import (
     HomeStatCard,
     ProgressCard,
 )
-from ezhuthaali.ui.level_cards import LevelCard, LevelMapWidget
-from ezhuthaali.ui.models import LevelState
-from ezhuthaali.ui.typing_widgets import HeroLetterLabel, LetterSequenceWidget
+from thattan.ui.level_cards import LevelCard, LevelMapWidget
+from thattan.ui.models import LevelState
+from thattan.ui.typing_widgets import HeroLetterLabel, LetterSequenceWidget
 
 
 class MainWindow(QMainWindow):
@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
         self._right_shift_label: Optional[QLabel] = None
         self._current_task_text: str = ""
         self._task_display_offset: int = 0
-        self._unlock_all_levels = os.environ.get("EZUTHALI_UNLOCK_ALL") == "1"
+        self._unlock_all_levels = os.environ.get("THATTAN_UNLOCK_ALL") == "1"
         self._input_has_error = False
 
         # Gamification stats (loaded from persistent store)
@@ -1099,7 +1099,8 @@ class MainWindow(QMainWindow):
             )
         self._start_session(level, progress.completed)
         if self._typing_title_label is not None:
-            self._typing_title_label.setText(level.name)
+            level_id = re.sub(r"^level", "", level.key)
+            self._typing_title_label.setText(f"நிலை {level_id}: {level.name}")
         if self._typing_feedback_label is not None:
             if view_only:
                 self._typing_feedback_label.setText("பார்வை மட்டும் — தட்டச்சு செய்ய முடியாது")

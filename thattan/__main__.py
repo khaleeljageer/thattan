@@ -1,4 +1,4 @@
-from ezhuthaali.app import run
+from thattan.app import run
 
 
 if __name__ == "__main__":

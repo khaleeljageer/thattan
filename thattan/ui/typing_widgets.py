@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QLabel, QWidget
 
-from ezhuthaali.ui.colors import HomeColors
+from thattan.ui.colors import HomeColors
 
 
 class LetterSequenceWidget(QWidget):
