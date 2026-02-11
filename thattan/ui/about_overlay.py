@@ -19,8 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# Palette used by the overlay (avoids circular import from main_window)
-_PRIMARY = "#00838f"
+_PRIMARY = "#00838f"  # Avoids circular import from main_window
 _PRIMARY_LIGHT = "#4fb3bf"
 
 
@@ -72,7 +71,6 @@ class AboutOverlay(QWidget):
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(0)
 
-        # ---- Left panel: branding (teal gradient) ----
         left_panel = QFrame()
         left_panel.setObjectName("aboutLeftPanel")
         left_panel.setFixedWidth(240)
@@ -146,13 +144,11 @@ class AboutOverlay(QWidget):
         left_layout.addStretch(1)
         container_layout.addWidget(left_panel)
 
-        # ---- Right panel: content (white background) ----
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(28, 28, 28, 28)
         right_layout.setSpacing(12)
 
-        # Single info card: Author, Organization, Email (no internal dividers)
         info_section = QFrame()
         info_section.setObjectName("aboutInfoCard")
         info_section.setStyleSheet(
@@ -169,6 +165,7 @@ class AboutOverlay(QWidget):
         info_inner.setSpacing(20)
 
         def _info_row(icon_char: str, label: str, value: str, is_link: bool = False, url: str = "") -> QWidget:
+            """Build a single info row with icon, label, and value (optionally linked)."""
             row = QWidget()
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
@@ -209,6 +206,7 @@ class AboutOverlay(QWidget):
             return row
 
         def _separator() -> QWidget:
+            """Build a thin horizontal separator line."""
             wrap = QWidget()
             wrap_layout = QHBoxLayout(wrap)
             wrap_layout.setContentsMargins(0, 0, 0, 0)
@@ -227,7 +225,6 @@ class AboutOverlay(QWidget):
         info_inner.addWidget(_info_row("📧", "EMAIL", "jskcse4@gmail.com"))
         right_layout.addWidget(info_section)
 
-        # GitHub & Website: light buttons with light grey border
         link_row = QHBoxLayout()
         link_row.setSpacing(10)
         for text, url, symbol in [
@@ -259,7 +256,6 @@ class AboutOverlay(QWidget):
             link_row.addWidget(card, 1)
         right_layout.addLayout(link_row)
 
-        # License and Built with (centered, light grey text)
         license_section = QWidget()
         footer_line = QHBoxLayout(license_section)
         footer_line.setContentsMargins(0, 8, 0, 8)
@@ -275,7 +271,6 @@ class AboutOverlay(QWidget):
         footer_line.addWidget(built_lbl, 0)
         right_layout.addWidget(license_section)
 
-        # Buttons: Report Issue (left), Close (right)
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
         report_issue_url = "https://github.com/khaleeljageer/thattan/issues/new"
@@ -333,6 +328,7 @@ class AboutOverlay(QWidget):
         main_layout.addWidget(container, 0, 0, 1, 1, Qt.AlignCenter)
 
     def _update_geometry(self) -> None:
+        """Resize overlay to match parent widget bounds."""
         parent = self.parentWidget()
         if parent is not None:
             self.setGeometry(parent.rect())

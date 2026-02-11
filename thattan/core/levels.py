@@ -10,19 +10,26 @@ import yaml
 
 @dataclass(frozen=True)
 class Level:
+    """A typing level with a unique key, display name, and list of practice tasks."""
+
     key: str
     name: str
     tasks: List[str]
 
 
 class LevelRepository:
+    """Loads and provides access to typing levels from YAML files in data/levels."""
+
     def __init__(self) -> None:
+        """Load all level*.yaml files from the data/levels directory."""
         self._levels = self._load_levels()
 
     def all(self) -> List[Level]:
+        """Return all loaded levels in sorted order."""
         return list(self._levels.values())
 
     def get(self, key: str) -> Level:
+        """Return the level with the given key. Raises KeyError if not found."""
         return self._levels[key]
 
     def _load_levels(self) -> Dict[str, Level]:
@@ -52,7 +59,7 @@ class LevelRepository:
             if isinstance(content, list):
                 tasks = [str(item).strip() for item in content if str(item).strip()]
             else:
-                # allow content as multiline string
+                # Content can be a multiline string; split into one task per non-empty line.
                 text = str(content).strip()
                 tasks = [line.strip() for line in text.splitlines() if line.strip()]
             if not tasks:

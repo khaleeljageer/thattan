@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 @dataclass
 class TaskResult:
+    """Result of a single typing task submission."""
+
     accuracy: float
     wpm: float
     cpm: float
@@ -26,6 +28,7 @@ class TypingSession:
     """
 
     def __init__(self, tasks: list[str], start_index: int = 0) -> None:
+        """Initialize a session with the given tasks, optionally starting at a specific index."""
         self._tasks = tasks
         self._index = start_index
         self._start_time = time.time()
@@ -33,33 +36,36 @@ class TypingSession:
         self._total_correct = 0
         self._total_errors = 0
 
-    # -- properties ----------------------------------------------------------
-
     @property
     def index(self) -> int:
+        """Index of the current task (0-based)."""
         return self._index
 
     @property
     def start_time(self) -> float:
+        """Unix timestamp when the session started."""
         return self._start_time
 
     @property
     def total_tasks(self) -> int:
+        """Total number of tasks in the session."""
         return len(self._tasks)
 
     @property
     def total_correct(self) -> int:
+        """Total number of correct characters typed so far."""
         return self._total_correct
 
-    # -- task flow -----------------------------------------------------------
-
     def current_task(self) -> str:
+        """Return the text of the current task."""
         return self._tasks[self._index]
 
     def is_complete(self) -> bool:
+        """Return True if all tasks have been submitted."""
         return self._index >= len(self._tasks)
 
     def submit(self, typed: str) -> TaskResult:
+        """Submit the user's typed text for the current task and advance to the next."""
         if self._index >= len(self._tasks):
             return TaskResult(accuracy=0.0, wpm=0.0, cpm=0.0, errors=0)
         target = self._tasks[self._index]
@@ -71,11 +77,7 @@ class TypingSession:
         self._total_errors += errors
 
         elapsed_minutes = max((time.time() - self._start_time) / 60.0, 1e-6)
-
-        # CPM: correct characters per minute
         cpm = self._total_correct / elapsed_minutes
-
-        # Net WPM: penalise errors (5 chars per error) then convert to words
         net_wpm = max(0.0, (self._total_chars - 5 * self._total_errors) / 5.0 / elapsed_minutes)
 
         accuracy = (correct / total) * 100.0 if total else 0.0
@@ -88,9 +90,8 @@ class TypingSession:
             errors=errors,
         )
 
-    # -- aggregate stats -----------------------------------------------------
-
     def aggregate_accuracy(self) -> float:
+        """Overall accuracy (correct chars / total chars) as a percentage."""
         total = max(self._total_chars, 1)
         return (self._total_correct / total) * 100.0
 
@@ -110,4 +111,5 @@ class TypingSession:
         return (self._total_chars / 5.0) / elapsed_minutes
 
     def aggregate_errors(self) -> int:
+        """Total number of errors across all submitted tasks."""
         return self._total_errors

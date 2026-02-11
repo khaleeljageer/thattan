@@ -56,6 +56,13 @@ from thattan.ui.typing_widgets import HeroLetterLabel, LetterSequenceWidget
 
 
 class MainWindow(QMainWindow):
+    """Main application window managing home screen, typing practice, and keyboard UI.
+
+    Provides a two-screen layout: a home screen with level selection and progress
+    stats, and a typing screen with real-time keystroke tracking against the
+    Tamil99 keyboard layout.
+    """
+
     def __init__(self, levels: LevelRepository, progress_store: ProgressStore) -> None:
         super().__init__()
         self._levels_repo = levels
@@ -72,7 +79,6 @@ class MainWindow(QMainWindow):
         self._unlock_all_levels = os.environ.get("THATTAN_UNLOCK_ALL") == "1"
         self._input_has_error = False
 
-        # Gamification stats (loaded from persistent store)
         ts, cs, bs = self._progress_store.get_gamification()
         self._total_score: int = ts
         self._current_streak: int = cs
@@ -81,32 +87,28 @@ class MainWindow(QMainWindow):
         self._consecutive_correct: int = 0
         self._view_only_session: bool = False
 
-        # Keystroke tracking
         self._keystroke_tracker = KeystrokeTracker()
         self._tamil99_layout = Tamil99KeyboardLayout()
         self._keycaps_map, _ = self._load_tamil99_maps()
-        self._keystroke_sequence: list[tuple[str, bool]] = []  # (key, needs_shift)
+        self._keystroke_sequence: list[tuple[str, bool]] = []
         self._keystroke_index: int = 0
-        self._typed_keystrokes: list[str] = []  # Track actual keys pressed
-        self._typed_tamil_text: str = ""  # Track typed Tamil text
-        
-        # Store references for adaptive layout
+        self._typed_keystrokes: list[str] = []
+        self._typed_tamil_text: str = ""
+
         self._keyboard_widget: Optional[QWidget] = None
         self._hands_image_label: Optional[QLabel] = None
         self._original_hands_pixmap: Optional[QPixmap] = None
         self._bottom_container: Optional[QWidget] = None
-        self._keyboard_font_sizes: dict[str, int] = {}  # Store current font sizes
+        self._keyboard_font_sizes: dict[str, int] = {}
         self._finger_guidance_label: Optional[QLabel] = None
         self._key_base_style_by_label: dict[QLabel, str] = {}
 
-        # Multi-screen navigation
         self._stack: Optional[QStackedWidget] = None
         self._home_screen: Optional[QWidget] = None
         self._typing_screen: Optional[QWidget] = None
         self._back_button: Optional[QPushButton] = None
         self._typing_title_label: Optional[QLabel] = None
 
-        # Typing screen: practice UI (letter sequence, hero, stats panel)
         self._letter_sequence_widget: Optional[LetterSequenceWidget] = None
         self._hero_letter_label: Optional[HeroLetterLabel] = None
         self._typing_time_label: Optional[QLabel] = None
@@ -124,7 +126,6 @@ class MainWindow(QMainWindow):
         self._typing_header: Optional[QWidget] = None
         self._typing_feedback_label: Optional[QLabel] = None
         self._level_pill: Optional[QFrame] = None
-        # Stat section muted/sub labels (for responsive font scaling)
         self._stat_time_header: Optional[QLabel] = None
         self._stat_wpm_header: Optional[QLabel] = None
         self._stat_wpm_sub: Optional[QLabel] = None
@@ -135,7 +136,6 @@ class MainWindow(QMainWindow):
         self._stat_correct_sub: Optional[QLabel] = None
         self._stat_wrong_sub: Optional[QLabel] = None
 
-        # Home screen widgets
         self._points_card: Optional[HomeStatCard] = None
         self._streak_card: Optional[HomeStatCard] = None
         self._best_streak_card: Optional[HomeStatCard] = None
@@ -145,13 +145,11 @@ class MainWindow(QMainWindow):
         self._levels_scroll: Optional[QScrollArea] = None
         self._levels_list_container: Optional[QWidget] = None
         self._home_levels_layout: Optional[QVBoxLayout] = None
-        
-        # Invalid input overlay (red flash)
+
         self._error_overlay: Optional[QWidget] = None
         self._error_overlay_effect: Optional[QGraphicsOpacityEffect] = None
         self._error_overlay_anim: Optional[QPropertyAnimation] = None
-        
-        # Finger mapping for QWERTY/Tamil99 layout
+
         self._key_to_finger = self._build_finger_mapping()
 
         self._build_ui()
@@ -160,90 +158,57 @@ class MainWindow(QMainWindow):
 
     
     def _build_finger_mapping(self) -> dict[str, tuple[str, str]]:
-        """Build mapping from key to (hand, finger) tuple.
-        
-        Returns:
-            dict mapping key name to (hand, finger) where:
-            - hand: 'left' or 'right'
-            - finger: 'thumb', 'index', 'middle', 'ring', 'pinky'
+        """Build mapping from QWERTY key name to ``(hand, finger)`` tuple.
+
+        The mapping follows standard touch-typing finger assignments.
         """
         mapping: dict[str, tuple[str, str]] = {}
-        # Left hand - Pinky
+
         for key in ['`', '1', 'Q', 'A', 'Z', 'TAB', 'CAPS']:
             mapping[key.upper()] = ('left', 'pinky')
-        mapping['SHIFT'] = ('left', 'pinky')  # Left shift (default, can be overridden)
-        
-        # Left hand - Ring
+        mapping['SHIFT'] = ('left', 'pinky')
+
         for key in ['2', 'W', 'S', 'X']:
             mapping[key.upper()] = ('left', 'ring')
-        
-        # Left hand - Middle
         for key in ['3', 'E', 'D', 'C']:
             mapping[key.upper()] = ('left', 'middle')
-        
-        # Left hand - Index
         for key in ['4', '5', 'R', 'T', 'F', 'G', 'V', 'B']:
             mapping[key.upper()] = ('left', 'index')
-        
-        # Left hand - Thumb (Space bar left side)
+
         mapping['SPACE'] = ('left', 'thumb')
-        mapping[' '] = ('left', 'thumb')  # Space as character
-        
-        # Right hand - Index
+        mapping[' '] = ('left', 'thumb')
+
         for key in ['6', '7', 'Y', 'U', 'H', 'J', 'N', 'M']:
             mapping[key.upper()] = ('right', 'index')
-        
-        # Right hand - Middle
         for key in ['8', 'I', 'K', ',']:
             mapping[key.upper()] = ('right', 'middle')
-        
-        # Right hand - Ring
         for key in ['9', 'O', 'L', '.']:
             mapping[key.upper()] = ('right', 'ring')
-        
-        # Right hand - Pinky
         for key in ['0', '-', '=', 'P', '[', ']', '\\', ';', "'", '/', 'ENTER', 'BACKSPACE']:
             mapping[key.upper()] = ('right', 'pinky')
-        
-        # Special keys - Right shift (typically used more often)
-        mapping['SHIFT'] = ('right', 'pinky')  # Right shift is more common
-        
-        # Special keys
-        mapping['CTRL'] = ('left', 'pinky')  # Left Ctrl
-        mapping['ALT'] = ('left', 'thumb')  # Left Alt
-        
-        # Handle numeric row and symbols
-        # These follow the same pattern as letters above them
-        
+
+        # Override SHIFT to right pinky (default when side is unknown)
+        mapping['SHIFT'] = ('right', 'pinky')
+        mapping['CTRL'] = ('left', 'pinky')
+        mapping['ALT'] = ('left', 'thumb')
+
         return mapping
     
     def _get_finger_name(self, key_label: str, needs_shift: bool = False) -> tuple[str, str]:
-        """Get finger name for a key in both English and Tamil.
-        
-        Args:
-            key_label: The key label (e.g., 'A', 'Space', 'Shift')
-            needs_shift: Whether Shift is required
-            
-        Returns:
-            tuple of (english_name, tamil_name)
+        """Return ``(english_name, tamil_name)`` describing which finger to use.
+
+        When *needs_shift* is True the opposite-hand Shift pinky is returned
+        (standard touch-typing rule: left-hand key → right Shift and vice-versa).
         """
-        # Handle Shift key separately
         if key_label.upper() == 'SHIFT':
-            # If it's the Shift key itself, determine which shift based on context
-            # For now, default to right shift (pinky)
             hand, finger = self._key_to_finger.get('SHIFT', ('right', 'pinky'))
         elif needs_shift:
-            # Shift rule:
-            # - If the actual key is typed with LEFT hand -> use RIGHT shift
-            # - If the actual key is typed with RIGHT hand -> use LEFT shift
             key_hand, _key_finger = self._key_to_finger.get(key_label.upper(), ('right', 'index'))
             shift_hand = 'right' if key_hand == 'left' else 'left'
             hand, finger = (shift_hand, 'pinky')
         else:
-            # Regular key - get finger mapping
             hand, finger = self._key_to_finger.get(key_label.upper(), ('right', 'index'))
-        
-        # Tamil finger names
+
         finger_names_tamil = {
             'thumb': 'கட்டைவிரல்',
             'index': 'சுட்டுவிரல்',
@@ -252,7 +217,6 @@ class MainWindow(QMainWindow):
             'pinky': 'சிறுவிரல்'
         }
         
-        # Tamil hand names
         hand_names_tamil = {
             'left': 'இடது',
             'right': 'வலது'
@@ -264,39 +228,30 @@ class MainWindow(QMainWindow):
         return (english_name, tamil_name)
 
     def _shift_side_for_key(self, key_label: str) -> str:
-        """Return which Shift side to use for a given key label ('left' or 'right')."""
+        """Return ``'left'`` or ``'right'`` indicating which Shift to press for *key_label*."""
         key_hand, _ = self._key_to_finger.get(key_label.upper(), ('right', 'index'))
         return 'right' if key_hand == 'left' else 'left'
 
     def _get_theme_colors(self) -> dict:
-        """Get light theme color palette"""
+        """Return the light-theme color palette used across all UI elements."""
         return {
-            # Background: neutral light grey with soft teal tint
             'bg_main': '#EEF6F6',
             'bg_container': 'rgba(255, 255, 255, 0.34)',
             'bg_card': 'rgba(255, 255, 255, 0.24)',
             'bg_input': 'rgba(255, 255, 255, 0.38)',
             'bg_hover': 'rgba(255, 255, 255, 0.46)',
-
-            # Typing text: dark neutral
             'text_primary': '#1F2933',
             'text_secondary': '#334155',
             'text_muted': '#64748B',
-
             'border': 'rgba(15, 23, 42, 0.14)',
             'border_light': 'rgba(15, 23, 42, 0.10)',
-
-            # Active character: accent (teal)
             'highlight': '#0F766E',
             'highlight_bg': 'rgba(15, 118, 110, 0.18)',
-
             'error': '#D64545',
             'error_bg': 'rgba(214, 69, 69, 0.18)',
             'success': '#2F855A',
             'success_bg': 'rgba(47, 133, 90, 0.18)',
             'progress': '#0F766E',
-
-            # Kept for compatibility with older styles
             'key_bg': 'rgba(255, 255, 255, 0.22)',
             'key_highlight': '#0F766E',
             'key_highlight_bg': 'rgba(15, 118, 110, 0.18)',
@@ -305,7 +260,7 @@ class MainWindow(QMainWindow):
         }
 
     def _get_finger_colors(self) -> dict[tuple[str, str], str]:
-        """Finger color palette (hand, finger) -> hex color."""
+        """Return mapping of ``(hand, finger)`` to hex colour for keyboard tinting."""
         return {
             ('left', 'pinky'): '#5C96EB',
             ('left', 'ring'): '#EF6060',
@@ -320,7 +275,7 @@ class MainWindow(QMainWindow):
         }
 
     def _darken_hex_color(self, hex_color: str, factor: float) -> str:
-        """Darken a hex color by multiplying RGB by factor (0..1)."""
+        """Darken a ``#RRGGBB`` colour by multiplying each channel by *factor* (0–1)."""
         try:
             c = hex_color.strip()
             if not c.startswith("#"):
@@ -339,7 +294,7 @@ class MainWindow(QMainWindow):
             return hex_color
 
     def _blend_hex_colors(self, a: str, b: str, t: float) -> str:
-        """Blend two #RRGGBB colors. t=0 -> a, t=1 -> b."""
+        """Linearly interpolate two ``#RRGGBB`` colours; *t* = 0 yields *a*, *t* = 1 yields *b*."""
         try:
             a = a.strip()
             b = b.strip()
@@ -356,19 +311,18 @@ class MainWindow(QMainWindow):
             return a
 
     def _finger_color_for_key(self, key_label: str) -> str:
-        """Return background color for a given key label."""
+        """Return the finger-zone background colour for *key_label*."""
         hand, finger = self._key_to_finger.get(key_label.upper(), ('right', 'index'))
         return self._get_finger_colors().get((hand, finger), '#5C96EB')
 
     def _muted_key_fill_color_for_key(self, key_label: str) -> str:
-        """Muted/pastel version of the finger color for this key."""
+        """Return a pastel version of the finger colour blended towards the background."""
         colors = self._get_theme_colors()
         base = self._finger_color_for_key(key_label)
-        # Blend towards window background to mute the color
         return self._blend_hex_colors(base, colors['bg_main'], 0.62)
 
     def _highlight_border_color_for_key(self, key_label: str) -> str:
-        """Border color for highlight that matches the finger palette (darker shade)."""
+        """Return a darkened finger-zone colour used as the highlight border."""
         base = self._finger_color_for_key(key_label)
         return self._darken_hex_color(base, 0.45)
 
@@ -381,6 +335,7 @@ class MainWindow(QMainWindow):
         border_color: str = "transparent",
         font_weight: int = 500,
     ) -> str:
+        """Generate a ``QLabel`` stylesheet for a single keyboard key."""
         colors = self._get_theme_colors()
         bg = self._muted_key_fill_color_for_key(key_label)
         border = f"{border_px}px solid {border_color}" if border_px > 0 else "none"
@@ -398,19 +353,18 @@ class MainWindow(QMainWindow):
         """
 
     def _build_ui(self) -> None:
+        """Construct the entire widget tree: home screen, typing screen, and overlays."""
         self.setWindowTitle("தட்டான் - தமிழ்99 பயிற்சி")
         self.setMinimumSize(1200, 800)
-        
+
         colors = self._get_theme_colors()
-        
-        # Set fallback background color
+
         self.setStyleSheet(f"""
             QMainWindow {{ 
                 background: {colors['bg_main']};
             }}
         """)
-        
-        # Create invalid input overlay (as child of main window to cover entire window)
+
         self._error_overlay = QWidget(self)
         self._error_overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._error_overlay.setStyleSheet("background-color: #EF6060;")
@@ -418,7 +372,6 @@ class MainWindow(QMainWindow):
         self._error_overlay_effect.setOpacity(0.0)
         self._error_overlay.setGraphicsEffect(self._error_overlay_effect)
         self._error_overlay.hide()
-        # Create the animation ONCE and reuse it (prevents accumulating children)
         self._error_overlay_anim = QPropertyAnimation(self._error_overlay_effect, b"opacity", self)
         self._error_overlay_anim.setDuration(200)
         self._error_overlay_anim.setKeyValueAt(0.0, 0.0)
@@ -426,7 +379,6 @@ class MainWindow(QMainWindow):
         self._error_overlay_anim.setKeyValueAt(1.0, 0.0)
         self._error_overlay_anim.finished.connect(self._error_overlay.hide)
 
-        # ---- Multi-screen container ----
         self._stack = QStackedWidget()
         self._home_screen = CoolBackground()
         self._typing_screen = CoolBackground()
@@ -441,12 +393,10 @@ class MainWindow(QMainWindow):
         self._level_completed_overlay = LevelCompletedOverlay(self._stack)
         self._level_completed_overlay.hide()
 
-        # ---- Home screen: Light theme glass UI (like `test.py`) ----
         home_layout = QVBoxLayout(self._home_screen)
         home_layout.setContentsMargins(16, 16, 16, 16)
         home_layout.setSpacing(20)
 
-        # Header card
         header = GlassCard()
         header_row = QHBoxLayout(header)
         header_row.setContentsMargins(16, 16, 16, 16)
@@ -500,11 +450,9 @@ class MainWindow(QMainWindow):
         header_row.addWidget(deco, 0, Qt.AlignRight)
         home_layout.addWidget(header, 0)
 
-        # Content area
         content_row = QHBoxLayout()
         content_row.setSpacing(28)
 
-        # Left panel: stats
         stats_panel = GlassCard()
         stats_panel.setFixedWidth(320)
         stats_layout = QVBoxLayout(stats_panel)
@@ -528,7 +476,6 @@ class MainWindow(QMainWindow):
         stats_row.addWidget(self._best_streak_card)
         stats_layout.addLayout(stats_row)
 
-        # Accuracy (elevated card like Points/Streak/Best)
         accuracy_box = GlassCard()
         accuracy_layout = QVBoxLayout(accuracy_box)
         accuracy_layout.setContentsMargins(14, 12, 14, 12)
@@ -604,7 +551,6 @@ class MainWindow(QMainWindow):
 
         content_row.addWidget(stats_panel, 0)
 
-        # Right panel: levels list
         levels_panel = GlassCard()
         levels_layout = QVBoxLayout(levels_panel)
         levels_layout.setContentsMargins(22, 22, 22, 22)
@@ -648,12 +594,10 @@ class MainWindow(QMainWindow):
         )
         home_layout.addWidget(footer_tagline, 0)
 
-        # ---- Typing screen (header + left stats + practice area; finger/keyboard unchanged) ----
         typing_layout = QVBoxLayout(self._typing_screen)
         typing_layout.setContentsMargins(16, 16, 16, 16)
         typing_layout.setSpacing(20)
 
-        # Header: back + center teal pill (level name) — no extra top/bottom padding, match children height
         typing_header = QWidget()
         self._typing_header = typing_header
         typing_header.setFixedHeight(48)
@@ -700,11 +644,9 @@ class MainWindow(QMainWindow):
         header_row.addStretch(1)
         typing_layout.addWidget(typing_header, 0)
 
-        # Content row: left stats panel | practice panel
         typing_content = QHBoxLayout()
         typing_content.setSpacing(24)
 
-        # Left panel: single card with all stats
         stats_panel = GlassCard()
         self._typing_stats_panel = stats_panel
         stats_panel.setFixedWidth(280)
@@ -712,7 +654,6 @@ class MainWindow(QMainWindow):
         stats_layout.setContentsMargins(16, 16, 16, 16)
         stats_layout.setSpacing(0)
 
-        # --- Helpers ---
         def _add_divider():
             line = QFrame()
             line.setFrameShape(QFrame.Shape.HLine)
@@ -759,7 +700,6 @@ class MainWindow(QMainWindow):
             row.addLayout(right, 1)
             return row
 
-        # --- Time ---
         self._stat_time_header = _muted_label("⏱️ நேரம்")
         stats_layout.addWidget(self._stat_time_header)
         self._typing_time_label = QLabel("0:00")
@@ -768,10 +708,8 @@ class MainWindow(QMainWindow):
 
         _add_divider()
 
-        # --- WPM / CPM ---
         wpm_col, self._typing_wpm_label = _stat_column("⚡ WPM", "0", "words/min")
         cpm_col, self._typing_cpm_label = _stat_column("⌨️ CPM", "0", "chars/min")
-        # Store sub-labels for rescaling (header + sub are at index 0 and 2 in each column)
         self._stat_wpm_header = wpm_col.itemAt(0).widget()
         self._stat_wpm_sub = wpm_col.itemAt(2).widget()
         self._stat_cpm_header = cpm_col.itemAt(0).widget()
@@ -780,7 +718,6 @@ class MainWindow(QMainWindow):
 
         _add_divider()
 
-        # --- Accuracy ---
         acc_header = QHBoxLayout()
         self._stat_acc_header = _muted_label("🎯 துல்லியம்")
         acc_header.addWidget(self._stat_acc_header)
@@ -795,7 +732,6 @@ class MainWindow(QMainWindow):
 
         _add_divider()
 
-        # --- Streak ---
         self._stat_streak_header = _muted_label("🔥 தொடர்ச்சி")
         stats_layout.addWidget(self._stat_streak_header)
         streak_row = QHBoxLayout()
@@ -808,13 +744,10 @@ class MainWindow(QMainWindow):
 
         _add_divider()
 
-        # --- Correct / Wrong ---
         correct_col, self._typing_correct_label = _stat_column("", "0", "சரி ✓", "#2e7d32", 26)
         wrong_col, self._typing_wrong_label = _stat_column("", "0", "தவறு ✗", "#c62828", 26)
-        # Remove empty header labels from correct/wrong columns
         correct_col.takeAt(0).widget().deleteLater()
         wrong_col.takeAt(0).widget().deleteLater()
-        # Store sub-labels for rescaling (index 0 is now the value, 1 is sub after deletion)
         self._stat_correct_sub = correct_col.itemAt(1).widget()
         self._stat_wrong_sub = wrong_col.itemAt(1).widget()
         stats_layout.addLayout(_side_by_side(correct_col, wrong_col, 36))
@@ -824,7 +757,6 @@ class MainWindow(QMainWindow):
         stats_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         typing_content.addWidget(stats_panel, 0)
 
-        # Right panel: practice area (letter sequence + hero, then progress at bottom)
         practice_card = GlassCard()
         self._typing_practice_card = practice_card
         practice_card.setMinimumHeight(280)
@@ -849,7 +781,6 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         practice_layout.addWidget(self.progress_bar)
 
-        # Hidden widgets for focus/key handling (zero height, no visible space)
         hidden_container = QWidget()
         hidden_container.setFixedHeight(0)
         hidden_container.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -874,7 +805,6 @@ class MainWindow(QMainWindow):
         typing_content.addWidget(practice_card, 1)
         typing_layout.addLayout(typing_content, 1)
 
-        # Single parent container for Finger UI and Keyboard (typing screen only)
         self._bottom_container = QWidget()
         self._bottom_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._bottom_container.setStyleSheet("""
@@ -940,7 +870,6 @@ class MainWindow(QMainWindow):
         typing_layout.addWidget(self._bottom_container, 0)
         self._bottom_container.installEventFilter(self)
 
-        # Start on home screen
         self._stack.setCurrentWidget(self._home_screen)
 
         self._update_error_overlay_geometry()
@@ -955,7 +884,7 @@ class MainWindow(QMainWindow):
         self._typing_stats_timer.timeout.connect(self._update_typing_stats_panel)
 
     def _aggregate_best_accuracy(self) -> float:
-        """Best recorded accuracy across all levels (0..100)."""
+        """Return the highest recorded accuracy (0–100) across all levels."""
         best = 0.0
         for lvl in self._levels_repo.all():
             p = self._progress_store.get_level_progress(lvl.key)
@@ -963,6 +892,7 @@ class MainWindow(QMainWindow):
         return max(0.0, min(100.0, best))
 
     def _set_home_accuracy(self, accuracy: float) -> None:
+        """Update the home-screen accuracy bar and percentage label."""
         if self._accuracy_bar is None or self._accuracy_value_label is None:
             return
         a = max(0.0, min(100.0, float(accuracy)))
@@ -970,11 +900,10 @@ class MainWindow(QMainWindow):
         self._accuracy_bar.set_progress(int(round(a)), 100, QColor(HomeColors.MINT).lighter(120).name(), HomeColors.PRIMARY)
 
     def _refresh_levels_list(self) -> None:
+        """Rebuild the home-screen level list and sync gamification stats."""
         level_states = self._build_level_states()
 
-        # Update right-panel list (new home UI)
         if self._home_levels_layout is not None:
-            # Clear old widgets
             while self._home_levels_layout.count():
                 item = self._home_levels_layout.takeAt(0)
                 w = item.widget()
@@ -1031,10 +960,10 @@ class MainWindow(QMainWindow):
 
             self._home_levels_layout.addStretch(1)
 
-        # Keep left panel and gamification cards in sync with stored progress (home screen)
         self._update_gamification_stats()
 
     def _build_level_states(self) -> list[LevelState]:
+        """Compute unlock/completion state for every level and mark the current target."""
         levels = self._levels_repo.all()
         states: list[LevelState] = []
         previous_completed = True
@@ -1045,7 +974,6 @@ class MainWindow(QMainWindow):
             states.append(LevelState(level=level, unlocked=unlocked, completed=progress.completed, is_current=False))
             previous_completed = progress.completed >= task_count
 
-        # Mark the first unlocked-but-incomplete level as the current "play" target.
         if not self._unlock_all_levels:
             for st in states:
                 if st.unlocked and st.completed < len(st.level.tasks):
@@ -1063,6 +991,7 @@ class MainWindow(QMainWindow):
         self._start_level(level_key, view_only=True)
 
     def _start_level(self, level_key: str, view_only: bool = False) -> None:
+        """Load a level, create its session, and switch to the typing screen."""
         self._view_only_session = view_only
         level = self._levels_repo.get(level_key)
         progress = self._progress_store.get_level_progress(level_key)
@@ -1085,6 +1014,7 @@ class MainWindow(QMainWindow):
         self._show_typing_screen()
 
     def _show_home_screen(self) -> None:
+        """Navigate back to the home screen and stop the stats timer."""
         if self._stack is None or self._home_screen is None:
             return
         self._stack.setCurrentWidget(self._home_screen)
@@ -1097,6 +1027,7 @@ class MainWindow(QMainWindow):
             self._levels_scroll.setFocus()
 
     def _show_typing_screen(self) -> None:
+        """Switch to the typing screen and start the stats refresh timer."""
         if self._stack is None or self._typing_screen is None:
             return
         self._stack.setCurrentWidget(self._typing_screen)
@@ -1108,18 +1039,18 @@ class MainWindow(QMainWindow):
             self._typing_stats_timer.start(1000)
 
     def _start_session(self, level: Level, start_index: int) -> None:
+        """Create a new typing session for *level*, starting at *start_index*."""
         task_count = len(level.tasks)
         if start_index >= task_count:
             start_index = 0
         self._session = TypingSession(level.tasks, start_index=start_index)
-        # Set progress bar range to match task count
         self.progress_bar.setRange(0, task_count)
-        # Reset keystroke tracker for new session
         self._keystroke_tracker.reset_session()
         self._update_gamification_stats()
         self._load_current_task()
 
     def _load_current_task(self) -> None:
+        """Prepare the UI for the next task in the current session."""
         if not self._session:
             return
         if self._session.is_complete():
@@ -1127,79 +1058,73 @@ class MainWindow(QMainWindow):
             return
         self._current_task_text = self._session.current_task()
         self._task_display_offset = 0
-        # Build keystroke sequence using Tamil99 layout
         self._keystroke_sequence = self._tamil99_layout.get_keystroke_sequence(self._current_task_text)
         self._keystroke_index = 0
         self._typed_keystrokes = []
-        self._typed_tamil_text = ""  # Track typed Tamil text
-        self._keystroke_to_char_map: dict[int, int] = {}  # keystroke_idx -> char_idx
-        self._build_keystroke_to_char_map()  # Build mapping from keystroke indices to character indices
+        self._typed_tamil_text = ""
+        self._keystroke_to_char_map: dict[int, int] = {}
+        self._build_keystroke_to_char_map()
         self._render_task_display("", self._current_task_text, is_error=False)
         self._set_input_text("")
         self.input_box.setFocus()
         self._update_keyboard_hint()
     
     def _build_keystroke_to_char_map(self) -> None:
-        """Build mapping from keystroke indices to character indices"""
+        """Map each keystroke index to the character index it contributes to.
+
+        Mirrors the character-decomposition logic of ``get_keystroke_sequence``
+        so that combined Tamil characters (e.g. "து" → two keystrokes) all
+        point back to the first Unicode code-unit.
+        """
         self._keystroke_to_char_map = {}
         keystroke_idx = 0
         target = self._current_task_text
         i = 0
-        
-        # Process text the same way get_keystroke_sequence does
-        # to correctly handle combined characters
+
         while i < len(target):
             char = target[i]
-            
+
             if char == ' ':
                 self._keystroke_to_char_map[keystroke_idx] = i
                 keystroke_idx += 1
                 i += 1
-            # Check for combined characters first (same logic as get_keystroke_sequence)
             elif i + 1 < len(target):
                 combined = char + target[i + 1]
                 if combined in self._tamil99_layout.CHAR_TO_KEYSTROKES:
-                    # Found combined character (e.g., "து" = "ld")
                     key_seq = self._tamil99_layout.CHAR_TO_KEYSTROKES[combined]
-                    # Map all keystrokes for this combined character to the first character index
                     for _ in key_seq:
                         self._keystroke_to_char_map[keystroke_idx] = i
                         keystroke_idx += 1
-                    i += 2  # Skip both characters
+                    i += 2
                     continue
-            # Single character
             if char in self._tamil99_layout.CHAR_TO_KEYSTROKES:
                 key_seq = self._tamil99_layout.CHAR_TO_KEYSTROKES[char]
-                # Handle special prefixes
                 if key_seq.startswith('^#'):
-                    # Tamil numeral: ^#1
                     self._keystroke_to_char_map[keystroke_idx] = i
-                    keystroke_idx += 1  # ^
+                    keystroke_idx += 1
                     self._keystroke_to_char_map[keystroke_idx] = i
-                    keystroke_idx += 1  # #
+                    keystroke_idx += 1
                     if len(key_seq) > 2:
                         self._keystroke_to_char_map[keystroke_idx] = i
-                        keystroke_idx += 1  # number
+                        keystroke_idx += 1
                 elif key_seq.startswith('^'):
-                    # Vowel sign: ^q
                     self._keystroke_to_char_map[keystroke_idx] = i
-                    keystroke_idx += 1  # ^
+                    keystroke_idx += 1
                     if len(key_seq) > 1:
                         self._keystroke_to_char_map[keystroke_idx] = i
-                        keystroke_idx += 1  # vowel key
+                        keystroke_idx += 1
                 else:
-                    # Regular sequence
                     for _ in key_seq:
                         self._keystroke_to_char_map[keystroke_idx] = i
                         keystroke_idx += 1
                 i += 1
             else:
-                # Fallback
                 self._keystroke_to_char_map[keystroke_idx] = i
                 keystroke_idx += 1
                 i += 1
 
     def _set_input_text(self, text: str) -> None:
+        """Set the hidden input box text without triggering auto-submit."""
         self._auto_submit_block = True
         self.input_box.setText(text)
         self.input_box.setCursorPosition(len(text))
@@ -1207,61 +1132,51 @@ class MainWindow(QMainWindow):
         self._set_input_error_state(False)
 
     def eventFilter(self, obj, event) -> bool:
-        """Filter key events to track individual keystrokes and resize events"""
+        """Intercept key-press events on the hidden input and resize events on the bottom bar."""
         if obj == self.input_box and event.type() == event.Type.KeyPress:
             return self._on_key_press(event)
         elif obj == self._bottom_container and event.type() == event.Type.Resize:
-            # Handle resize events for adaptive layout
-            QTimer.singleShot(10, self._adjust_adaptive_layout)  # Delay to ensure size is updated
+            QTimer.singleShot(10, self._adjust_adaptive_layout)
         return super().eventFilter(obj, event)
-    
+
     def resizeEvent(self, event) -> None:
-        """Handle window resize to adjust keyboard and finger UI"""
+        """Re-layout adaptive UI elements when the window is resized."""
         super().resizeEvent(event)
         self._update_error_overlay_geometry()
-        QTimer.singleShot(10, self._adjust_adaptive_layout)  # Delay to ensure size is updated
+        QTimer.singleShot(10, self._adjust_adaptive_layout)
         QTimer.singleShot(10, self._rescale_typing_screen)
     
     def _adjust_adaptive_layout(self) -> None:
-        """Adjust keyboard and finger UI sizes based on available space"""
+        """Redistribute space between the finger-guide image and the keyboard widget."""
         if not self._keyboard_widget or not self._bottom_container:
             return
-        
-        # Calculate available width (accounting for margins and spacing)
-        available_width = self._bottom_container.width() - 40  # Padding
+
+        available_width = self._bottom_container.width() - 40
         if available_width <= 0:
             return
-        
-        # Calculate space allocation
-        # Reserve minimum space for finger UI, rest for keyboard
+
         min_hands_width = 200
         max_hands_width = 600
-        hands_ratio = 0.3  # Finger UI should take ~30% of space
-        
-        # Calculate ideal widths
+        hands_ratio = 0.3
+        min_keyboard_width = 400
+
         ideal_hands_width = min(max_hands_width, max(min_hands_width, int(available_width * hands_ratio)))
-        keyboard_width = available_width - ideal_hands_width - 15  # 15px spacing
-        
-        # Ensure keyboard has reasonable minimum width
-        min_keyboard_width = 400  # Reduced from 600 to allow more flexibility
+        keyboard_width = available_width - ideal_hands_width - 15
+
         if keyboard_width < min_keyboard_width and available_width > min_keyboard_width + min_hands_width + 15:
-            # Only enforce minimum if we have enough total space
             keyboard_width = min_keyboard_width
-            ideal_hands_width = available_width - keyboard_width - 15
-            ideal_hands_width = max(min_hands_width, ideal_hands_width)
-        
-        # Adjust hands image if needed
+            ideal_hands_width = max(min_hands_width, available_width - keyboard_width - 15)
+
         if self._hands_image_label and self._original_hands_pixmap:
             current_width = self._hands_image_label.width()
-            if abs(ideal_hands_width - current_width) > 10:  # Only update if significant change
+            if abs(ideal_hands_width - current_width) > 10:
                 scaled_pixmap = self._original_hands_pixmap.scaledToWidth(
                     ideal_hands_width, Qt.SmoothTransformation
                 )
                 self._hands_image_label.setPixmap(scaled_pixmap)
                 self._hands_image_label.setMinimumWidth(ideal_hands_width)
                 self._hands_image_label.setMaximumWidth(ideal_hands_width)
-        
-        # Update keyboard font sizes based on actual width
+
         if keyboard_width > 0:
             self._update_keyboard_font_sizes(keyboard_width)
     
@@ -1277,15 +1192,13 @@ class MainWindow(QMainWindow):
         if w < 100 or h < 100:
             return
 
-        # ---- reference basis (designed at 1920×1080) ----
-        REF_W = 1920
-        REF_H = 1080
-        sw = w / REF_W          # horizontal scale
-        sh = h / REF_H          # vertical scale
-        s = min(sw, sh)          # uniform scale (keeps aspect)
+        REF_W, REF_H = 1920, 1080
+        sw = w / REF_W
+        sh = h / REF_H
+        s = min(sw, sh)
 
-        # ---- helper: rescale font-size inside an existing stylesheet ----
         def _set_font(lbl: Optional[QLabel], ref_px: int) -> None:
+            """Replace ``font-size`` in *lbl*'s stylesheet with a scaled value."""
             if lbl is None:
                 return
             sz = max(9, int(ref_px * s))
@@ -1296,7 +1209,6 @@ class MainWindow(QMainWindow):
             if new_ss != cur:
                 lbl.setStyleSheet(new_ss)
 
-        # ---- Outer typing layout margins ----
         if self._typing_screen is not None:
             outer_lay = self._typing_screen.layout()
             if outer_lay is not None:
@@ -1304,15 +1216,12 @@ class MainWindow(QMainWindow):
                 outer_lay.setContentsMargins(om, om, om, om)
                 outer_lay.setSpacing(max(8, int(20 * s)))
 
-        # ---- Stats panel width ----
         stats_w = max(180, int(280 * sw))
         if self._typing_stats_panel is not None:
             self._typing_stats_panel.setFixedWidth(stats_w)
-            # Rescale internal margins
             m = max(10, int(16 * s))
             self._typing_stats_panel.layout().setContentsMargins(m, m, m, m)
 
-        # ---- Header bar ----
         hdr_h = max(32, int(48 * sh))
         if self._typing_header is not None:
             self._typing_header.setFixedHeight(hdr_h)
@@ -1352,7 +1261,6 @@ class MainWindow(QMainWindow):
                 f"color: white; font-size: {title_fs}px; font-weight: 800;"
             )
 
-        # ---- Stats: big value labels ----
         _set_font(self._typing_time_label, 36)
         _set_font(self._typing_wpm_label, 32)
         _set_font(self._typing_cpm_label, 32)
@@ -1361,8 +1269,6 @@ class MainWindow(QMainWindow):
         _set_font(self._typing_best_streak_label, 13)
         _set_font(self._typing_correct_label, 26)
         _set_font(self._typing_wrong_label, 26)
-
-        # ---- Stats: muted / sub labels ----
         _set_font(self._stat_time_header, 12)
         _set_font(self._stat_wpm_header, 12)
         _set_font(self._stat_wpm_sub, 10)
@@ -1373,14 +1279,12 @@ class MainWindow(QMainWindow):
         _set_font(self._stat_correct_sub, 11)
         _set_font(self._stat_wrong_sub, 11)
 
-        # ---- Practice area: feedback label ----
         if self._typing_feedback_label is not None:
             fb_sz = max(10, int(16 * s))
             self._typing_feedback_label.setStyleSheet(
                 f"color: {HomeColors.TEXT_SECONDARY}; font-size: {fb_sz}px; font-weight: 600;"
             )
 
-        # ---- Practice area: card margins ----
         if self._typing_practice_card is not None:
             pm = max(12, int(32 * s))
             pv = max(10, int(24 * s))
@@ -1389,7 +1293,6 @@ class MainWindow(QMainWindow):
                 lay.setContentsMargins(pm, pv, pm, pv)
                 lay.setSpacing(max(8, int(20 * s)))
 
-        # ---- Hero letter ----
         if self._hero_letter_label is not None:
             hero_dim = max(64, int(120 * s))
             hero_font = max(24, int(48 * s))
@@ -1407,14 +1310,11 @@ class MainWindow(QMainWindow):
                 }}
             """)
 
-        # ---- Letter sequence boxes ----
         if self._letter_sequence_widget is not None:
             seq_h = max(32, int(60 * sh))
             self._letter_sequence_widget.setFixedHeight(seq_h)
-            # Store scale for paintEvent
             self._letter_sequence_widget._scale = s
 
-        # ---- Finger guidance label ----
         if self._finger_guidance_label is not None:
             fg_fs = max(10, int(16 * s))
             fg_pad_v = max(6, int(12 * s))
@@ -1428,27 +1328,20 @@ class MainWindow(QMainWindow):
                 self._finger_guidance_label.setStyleSheet(new_ss)
 
     def _update_keyboard_font_sizes(self, keyboard_width: int) -> None:
-        """Update keyboard font sizes based on available width"""
+        """Scale keyboard key fonts proportionally to *keyboard_width* (reference: 1402 px → 18 px)."""
         if not self._keyboard_widget:
             return
-        
-        # Reference: 1402px keyboard width = 18px base font
-        # Scale font proportionally with keyboard width
-        reference_keyboard_width = 1402
-        font_scale = keyboard_width / reference_keyboard_width
+
+        font_scale = keyboard_width / 1402
         base_font_size = max(12, int(18 * font_scale))
-        
-        # Calculate derived font sizes
         tamil_base_font = base_font_size
         english_font = max(7, int(base_font_size * 0.75))
         tamil_shift_font = max(9, int(base_font_size * 0.75))
         special_font = max(9, int(base_font_size * 0.78))
-        
-        # Only update if font sizes changed significantly
+
         if (self._keyboard_font_sizes.get('base', 0) != base_font_size or
             abs(self._keyboard_font_sizes.get('base', 18) - base_font_size) > 1):
-            
-            # Store font sizes
+
             self._keyboard_font_sizes = {
                 'base': base_font_size,
                 'tamil_base': tamil_base_font,
@@ -1456,38 +1349,22 @@ class MainWindow(QMainWindow):
                 'tamil_shift': tamil_shift_font,
                 'special': special_font
             }
-            
-            # Rebuild keyboard HTML with new font sizes
+
             self._rebuild_keyboard_labels()
-            
-            # Update special key labels
-            colors = self._get_theme_colors()
-            special_labels = {
-                "Backspace": "←",
-                "Tab": "Tab",
-                "Caps": "Caps Lock",
-                "Enter": "Enter",
-                "Shift": "Shift",
-                "Ctrl": "Ctrl",
-                "Alt": "Alt",
-                "Space": "Space",
-            }
-            
-            # Update Space key
+
             if "Space" in self._key_labels:
                 space_label = self._key_labels["Space"]
                 style = self._build_key_style("Space", special_font, font_weight=500)
                 space_label.setStyleSheet(style)
                 self._key_base_style_by_label[space_label] = style
-            
-            # Update shift labels
+
             for shift_label in self._shift_labels:
                 style = self._build_key_style("Shift", special_font, font_weight=500)
                 shift_label.setStyleSheet(style)
                 self._key_base_style_by_label[shift_label] = style
     
     def _on_key_press(self, event: QKeyEvent) -> bool:
-        """Handle individual key press events"""
+        """Process a single physical keypress against the expected keystroke sequence."""
         if not self._session:
             return False
         if self._view_only_session:
@@ -1554,6 +1431,7 @@ class MainWindow(QMainWindow):
         return True
 
     def _update_error_overlay_geometry(self) -> None:
+        """Resize the error-flash overlay to cover the full window."""
         if not self._error_overlay:
             return
         s = self.size()
@@ -1564,7 +1442,6 @@ class MainWindow(QMainWindow):
         if not self._error_overlay or not self._error_overlay_effect or not self._error_overlay_anim:
             return
         
-        # Stop any running animation (we reuse the same object)
         try:
             self._error_overlay_anim.stop()
         except Exception:
@@ -1579,39 +1456,38 @@ class MainWindow(QMainWindow):
         self._error_overlay_anim.start()
     
     def _update_typed_tamil_text_from_keystrokes(self) -> None:
-        """Reconstruct Tamil text from typed keystrokes"""
-        # Process the target text and match keystrokes to characters
+        """Reconstruct Tamil text by matching typed keystrokes against the target.
+
+        Walks the target string character-by-character (handling combined
+        Tamil characters, special prefix sequences like ``^#`` for numerals and
+        ``^`` for vowel signs) and verifies that the recorded keystrokes match.
+        Stops at the first mismatch.
+        """
         target = self._current_task_text
         typed_ks_count = len(self._typed_keystrokes)
-        
-        # Reconstruct by processing target text character by character
+
         reconstructed = ""
         keystroke_idx = 0
         i = 0
-        
+
         while i < len(target) and keystroke_idx < typed_ks_count:
             char = target[i]
-            
+
             if char == ' ':
                 if keystroke_idx < typed_ks_count and self._typed_keystrokes[keystroke_idx] == "Space":
                     reconstructed += " "
                     keystroke_idx += 1
                 i += 1
                 continue
-            
-            # Check for combined characters first
+
             elif i + 1 < len(target):
                 combined = char + target[i + 1]
                 if combined in self._tamil99_layout.CHAR_TO_KEYSTROKES:
                     key_seq = self._tamil99_layout.CHAR_TO_KEYSTROKES[combined]
-                    # Check if we have enough keystrokes for this combined character
                     if keystroke_idx + len(key_seq) <= typed_ks_count:
-                        # Verify the keystrokes match
                         matches = True
                         for j, expected_key in enumerate(key_seq):
-                            typed_key = self._typed_keystrokes[keystroke_idx + j].upper()
-                            expected_key_upper = expected_key.upper()
-                            if typed_key != expected_key_upper:
+                            if self._typed_keystrokes[keystroke_idx + j].upper() != expected_key.upper():
                                 matches = False
                                 break
                         if matches:
@@ -1619,16 +1495,12 @@ class MainWindow(QMainWindow):
                             keystroke_idx += len(key_seq)
                             i += 2
                             continue
-            
-            # Single character
+
             if char in self._tamil99_layout.CHAR_TO_KEYSTROKES:
                 key_seq = self._tamil99_layout.CHAR_TO_KEYSTROKES[char]
-                # Handle special prefixes
                 if key_seq.startswith('^#'):
-                    # Tamil numeral: ^#1
                     required_keys = 3 if len(key_seq) > 2 else 2
                     if keystroke_idx + required_keys <= typed_ks_count:
-                        # Verify keystrokes match
                         if (self._typed_keystrokes[keystroke_idx].upper() == '^' and
                             keystroke_idx + 1 < typed_ks_count and
                             self._typed_keystrokes[keystroke_idx + 1].upper() == '#'):
@@ -1640,10 +1512,8 @@ class MainWindow(QMainWindow):
                                     i += 1
                                     continue
                 elif key_seq.startswith('^'):
-                    # Vowel sign: ^q
                     required_keys = 2 if len(key_seq) > 1 else 1
                     if keystroke_idx + required_keys <= typed_ks_count:
-                        # Verify keystrokes match
                         if self._typed_keystrokes[keystroke_idx].upper() == '^':
                             if len(key_seq) > 1:
                                 if (keystroke_idx + 1 < typed_ks_count and
@@ -1653,14 +1523,10 @@ class MainWindow(QMainWindow):
                                     i += 1
                                     continue
                 else:
-                    # Regular sequence
                     if keystroke_idx + len(key_seq) <= typed_ks_count:
-                        # Verify keystrokes match
                         matches = True
                         for j, expected_key in enumerate(key_seq):
-                            typed_key = self._typed_keystrokes[keystroke_idx + j].upper()
-                            expected_key_upper = expected_key.upper()
-                            if typed_key != expected_key_upper:
+                            if self._typed_keystrokes[keystroke_idx + j].upper() != expected_key.upper():
                                 matches = False
                                 break
                         if matches:
@@ -1669,43 +1535,32 @@ class MainWindow(QMainWindow):
                             i += 1
                             continue
             else:
-                # Fallback for punctuation and other characters not in CHAR_TO_KEYSTROKES
-                # Check if the next keystroke matches this character
+                # Fallback for non-Tamil characters (punctuation, etc.)
                 if keystroke_idx < typed_ks_count:
                     typed_key = self._typed_keystrokes[keystroke_idx]
-                    # Get the expected key for this character using _map_char_to_key
                     key_label, needs_shift = self._map_char_to_key(char)
-                    
-                    # Check if typed key matches the expected key
-                    # Normalize for comparison (handle both direct match and key label match)
-                    if (typed_key == char or 
+                    if (typed_key == char or
                         typed_key.upper() == char.upper() or
                         typed_key.upper() == key_label.upper()):
                         reconstructed += char
                         keystroke_idx += 1
                         i += 1
                         continue
-            
-            # If we can't match, break
+
             break
-        
+
         self._typed_tamil_text = reconstructed
     
     def _update_display_from_keystrokes(self) -> None:
-        """Update the display based on typed keystrokes"""
+        """Refresh the task display and input box from the reconstructed Tamil text."""
         target = self._current_task_text
-        
-        # Use the tracked Tamil text
         typed_text = self._typed_tamil_text
-        
         is_error = self._input_has_error
         self._update_task_display_for_typed(typed_text, target, is_error)
-        
-        # Update input box to show the typed Tamil text
         self._set_input_text(typed_text)
     
     def _submit_task_from_keystrokes(self) -> None:
-        """Submit task when all keystrokes are completed"""
+        """Submit the current task once all expected keystrokes have been entered."""
         if not self._session or self._session.is_complete():
             return
 
@@ -1718,10 +1573,11 @@ class MainWindow(QMainWindow):
         self._input_has_error = False
     
     def _update_stats_from_tracker(self) -> None:
-        """Update UI stats from keystroke tracker"""
+        """Propagate keystroke-tracker changes to the gamification UI."""
         self._update_gamification_stats()
 
     def _submit_task(self, typed: Optional[str] = None) -> None:
+        """Score the typed text, persist progress, and advance to the next task."""
         if not self._session or not self._current_level:
             return
         if self._session.is_complete():
@@ -1747,6 +1603,7 @@ class MainWindow(QMainWindow):
         self._update_keyboard_hint()
 
     def _update_stats(self, result: TaskResult) -> None:
+        """Update score, streak, and combo multiplier from a single task result."""
         if result.accuracy == 100.0:
             self._current_streak += 1
             if self._current_streak > self._best_streak:
@@ -1782,7 +1639,6 @@ class MainWindow(QMainWindow):
         if self._best_streak_card is not None:
             self._best_streak_card.set_value(f"{self._best_streak}")
 
-        # Keep accuracy bar meaningful: during a session use session aggregate; otherwise show best stored.
         if self._session is not None:
             self._set_home_accuracy(self._session.aggregate_accuracy())
         else:
@@ -1826,6 +1682,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(idx)
 
     def _level_completed(self) -> None:
+        """Show the level-completed overlay and return to the home screen."""
         if self._typing_stats_timer is not None:
             self._typing_stats_timer.stop()
         self.task_display.setText("நிலை முடிந்தது! அடுத்த நிலையைத் தேர்வு செய்யவும்.")
@@ -1842,6 +1699,7 @@ class MainWindow(QMainWindow):
         self._clear_keyboard_highlight()
 
     def _reset_progress(self) -> None:
+        """Show the confirmation overlay and, if confirmed, wipe all progress."""
         overlay = self._reset_overlay
         overlay.setGeometry(self._stack.rect())
         overlay.raise_()
@@ -1872,6 +1730,7 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def _show_about(self) -> None:
+        """Display the About overlay as a modal dialog."""
         overlay = self._about_overlay
         overlay.setGeometry(self._stack.rect())
         overlay.raise_()
@@ -1882,27 +1741,21 @@ class MainWindow(QMainWindow):
         overlay.closed.disconnect(loop.quit)
 
     def _build_keyboard(self) -> QWidget:
+        """Create a virtual Tamil99 keyboard widget laid out on a ``QGridLayout``."""
         container = QWidget()
         grid = QGridLayout(container)
         grid.setSpacing(8)
-        # Set padding to match outer container padding for proper spacing
         container.setStyleSheet("background: transparent; border-radius: 12px; padding: 0px;")
 
         colors = self._get_theme_colors()
         
-        # Calculate base font size - will be updated dynamically based on actual width
-        # Use initial estimate based on screen size
         screen = QGuiApplication.primaryScreen()
         if screen is not None:
-            screen_width = screen.availableGeometry().width()
-            # Reference: 1920px screen = 18px base font
-            # Scale font proportionally with screen width
-            font_scale = screen_width / 1920.0
+            font_scale = screen.availableGeometry().width() / 1920.0
             base_font_size = max(14, int(18 * font_scale))
         else:
             base_font_size = 18
-        
-        # Store initial font sizes
+
         self._keyboard_font_sizes = {
             'base': base_font_size,
             'tamil_base': base_font_size,
@@ -1933,8 +1786,6 @@ class MainWindow(QMainWindow):
             "Space": "Space",
         }
 
-        # Calculate font sizes based on the base font size (which scales with screen)
-        # These ratios maintain good readability at different sizes
         tamil_base_font = self._keyboard_font_sizes['tamil_base']
         english_font = self._keyboard_font_sizes['english']
         tamil_shift_font = self._keyboard_font_sizes['tamil_shift']
@@ -1953,14 +1804,10 @@ class MainWindow(QMainWindow):
                 label.setAlignment(Qt.AlignCenter)
                 label.setTextFormat(Qt.RichText)
                 
-                # Calculate key dimensions - use flexible sizing
-                # Base width will scale with grid columns
                 key_width = int(unit_pixels * size * unit_scale)
                 key_height = base_key_height
-                
+
                 label.setMinimumHeight(key_height)
-                # Don't set fixed minimum width - let grid handle it with stretch factors
-                # This allows keys to scale down when space is limited
                 label.setMinimumWidth(0)
 
                 if key in special_labels:
@@ -2006,7 +1853,6 @@ class MainWindow(QMainWindow):
                     self._key_labels[key.upper()] = label
                 if key == "Shift":
                     self._shift_labels.append(label)
-                    # Identify left vs right shift by position (row 3 has two Shift keys)
                     if row_index == 3 and start_col == 0:
                         self._left_shift_label = label
                     elif row_index == 3:
@@ -2014,34 +1860,28 @@ class MainWindow(QMainWindow):
 
         max_columns = max(sum(int(size * unit_scale) for _, size in row) for row in rows)
         for column in range(max_columns):
-            # Set a very small minimum width to allow scaling down
             grid.setColumnMinimumWidth(column, 2)
-            # Use stretch factors to allow columns to scale proportionally
             grid.setColumnStretch(column, 1)
-        
-        # Ensure the grid layout has proper margins to prevent cropping
+
         grid.setContentsMargins(0, 0, 0, 0)
         return container
     
     def _rebuild_keyboard_labels(self) -> None:
-        """Rebuild keyboard label HTML with updated font sizes"""
+        """Re-render the HTML content of all regular keyboard key labels with current font sizes."""
         if not self._keyboard_widget or not self._keyboard_font_sizes:
             return
-        
+
         colors = self._get_theme_colors()
         tamil_base_font = self._keyboard_font_sizes.get('tamil_base', 18)
         english_font = self._keyboard_font_sizes.get('english', 14)
         tamil_shift_font = self._keyboard_font_sizes.get('tamil_shift', 14)
-        
-        # Special keys that shouldn't be updated (handled separately)
+
         special_keys = {"Space", "Tab", "Caps", "Enter", "Backspace", "Ctrl", "Alt", "Shift"}
-        
-        # Update all regular key labels (non-special keys)
+
         for key_name, label in self._key_labels.items():
             if key_name in special_keys:
-                continue  # Special keys are handled separately
-            
-            # Get the key display mapping
+                continue
+
             display = self._keycaps_map.get(key_name, (key_name, None))
             english = html.escape(key_name)
             tamil_base = html.escape(display[0]) if display[0] else ""
@@ -2067,6 +1907,7 @@ class MainWindow(QMainWindow):
             )
 
     def _clear_keyboard_highlight(self) -> None:
+        """Restore all highlighted keys to their default style."""
         for label in self._highlighted_keys:
             base_style = self._key_base_style_by_label.get(label)
             if base_style:
@@ -2074,6 +1915,7 @@ class MainWindow(QMainWindow):
         self._highlighted_keys = []
 
     def _highlight_key(self, label: QLabel, key_label: str = "", is_shift: bool = False) -> None:
+        """Apply a coloured border highlight to a single keyboard key label."""
         font_px = self._keyboard_font_sizes.get('special', 18) if (is_shift or key_label in {"Shift", "Space", "Backspace", "Tab", "Caps", "Enter", "Ctrl", "Alt"}) else self._keyboard_font_sizes.get('base', 18)
         highlight_key = key_label or "Shift"
         border_color = self._highlight_border_color_for_key(highlight_key)
@@ -2082,6 +1924,7 @@ class MainWindow(QMainWindow):
         self._highlighted_keys.append(label)
 
     def _update_keyboard_hint(self) -> None:
+        """Highlight the next expected key and update the finger-guidance label."""
         if not self._session:
             self._clear_keyboard_highlight()
             if self._finger_guidance_label:
@@ -2099,20 +1942,16 @@ class MainWindow(QMainWindow):
             if key_label in self._key_labels:
                 self._highlight_key(self._key_labels[key_label], key_label=key_label)
             if needs_shift:
-                # Highlight the correct Shift key based on hand rule
                 side = self._shift_side_for_key(key_label)
                 shift_label = self._right_shift_label if side == 'right' else self._left_shift_label
                 if shift_label is not None:
                     self._highlight_key(shift_label, key_label="Shift", is_shift=True)
                 else:
-                    # Fallback if we couldn't identify sides
                     for s in self._shift_labels:
                         self._highlight_key(s, key_label="Shift", is_shift=True)
             
-            # Update finger guidance label
             if self._finger_guidance_label:
                 english_finger, tamil_finger = self._get_finger_name(key_label, needs_shift)
-                # Format: "Use Left Thumb / இடது கட்டைவிரல்"
                 if needs_shift:
                     shift_side = self._shift_side_for_key(key_label)
                     guidance_text = f"<div style='text-align: center;'>Hold {shift_side.capitalize()} Shift<br/>{english_finger}<br/>{tamil_finger}</div>"
@@ -2121,7 +1960,6 @@ class MainWindow(QMainWindow):
                 self._finger_guidance_label.setText(guidance_text)
                 self._finger_guidance_label.setVisible(True)
         else:
-            # Task is complete - highlight space bar to indicate user should press space for next task
             colors = self._get_theme_colors()
             self._clear_keyboard_highlight()
             if "Space" in self._key_labels:
@@ -2142,7 +1980,6 @@ class MainWindow(QMainWindow):
                 """)
                 self._highlighted_keys.append(space_label)
             
-            # Update finger guidance for space bar
             if self._finger_guidance_label:
                 english_finger, tamil_finger = self._get_finger_name("Space", False)
                 guidance_text = f"Press Space to continue<br/>Use {english_finger}<br/>{tamil_finger}"
@@ -2150,7 +1987,7 @@ class MainWindow(QMainWindow):
                 self._finger_guidance_label.setVisible(True)
     
     def _map_char_to_key(self, char: str) -> tuple[str, bool]:
-        # Fallback for non-Tamil characters (spaces, punctuation, etc.)
+        """Return ``(key_label, needs_shift)`` for a non-Tamil character."""
         if char == " ":
             return "Space", False
 
@@ -2189,6 +2026,7 @@ class MainWindow(QMainWindow):
         return char.upper(), False
 
     def _load_tamil99_maps(self) -> tuple[dict[str, tuple[str, Optional[str]]], dict[str, str]]:
+        """Parse the m17n Tamil99 mapping file into keycap labels and char→keystroke maps."""
         mapping_path = Path(__file__).parent.parent / "data" / "m17n" / "ta-tamil99.mim"
         if not mapping_path.exists():
             return {}, {}
@@ -2197,10 +2035,10 @@ class MainWindow(QMainWindow):
         pattern = re.compile(r'\("([^"]+)"\s+(\?[^)]+|"[^"]*")\)')
 
         keycaps: dict[str, tuple[str, Optional[str]]] = {}
-        char_to_keystrokes: dict[str, str] = {}  # Tamil char -> keystroke sequence (e.g., "oa")
+        char_to_keystrokes: dict[str, str] = {}
 
         for match in pattern.finditer(text):
-            key_seq = match.group(1)  # Can be single or multi-character like "oa"
+            key_seq = match.group(1)
             out = match.group(2)
 
             if out.startswith("?"):
@@ -2211,7 +2049,6 @@ class MainWindow(QMainWindow):
             if not out_value:
                 continue
 
-            # Build keycaps for single-character keys only
             if len(key_seq) == 1:
                 key_label = key_seq.upper() if key_seq.isalpha() else key_seq
                 if key_seq.isalpha():
@@ -2231,28 +2068,22 @@ class MainWindow(QMainWindow):
                         base = out_value
                     keycaps[key_label] = (base, shift)
 
-            # Build reverse mapping: Tamil character -> keystroke sequence
-            # Only store mappings where output is EXACTLY that character (not a compound)
+            # Reverse mapping: single Tamil character → shortest keystroke sequence.
+            # Priority: single-key > pulli ending in 'f' > vowel-sign prefix '^' > shorter.
             if len(out_value) == 1:
                 char_code = ord(out_value)
-                # Tamil Unicode range: 0B80-0BFF (includes all Tamil chars, combining marks, etc.)
                 if 0x0B80 <= char_code <= 0x0BFF:
-                    # Prefer shorter sequences, but prioritize single-character keys
                     should_store = False
                     if out_value not in char_to_keystrokes:
                         should_store = True
                     else:
                         current_seq = char_to_keystrokes[out_value]
-                        # Prefer single-character sequences
                         if len(key_seq) == 1 and len(current_seq) > 1:
                             should_store = True
-                        # For pulli (்), prefer sequences ending with 'f'
                         elif out_value == '்' and key_seq.endswith('f') and not current_seq.endswith('f'):
                             should_store = True
-                        # For vowel signs, prefer sequences starting with '^'
                         elif 0x0BBE <= char_code <= 0x0BFF and key_seq.startswith('^') and not current_seq.startswith('^'):
                             should_store = True
-                        # Otherwise prefer shorter sequences
                         elif len(key_seq) < len(current_seq):
                             should_store = True
                     
@@ -2281,12 +2112,14 @@ class MainWindow(QMainWindow):
         return keycaps, char_to_keystrokes
 
     def _update_task_display_for_typed(self, typed: str, target: str, is_error: bool) -> None:
+        """Convenience wrapper that resets the display offset and re-renders."""
         if not target:
             return
         self._task_display_offset = 0
         self._render_task_display(typed, target, is_error)
 
     def _render_task_display(self, typed: str, target: str, is_error: bool) -> None:
+        """Update the letter-sequence widget, hero label, and rich-text task display."""
         if not target:
             self.task_display.setText("")
             if self._letter_sequence_widget is not None:
@@ -2298,7 +2131,6 @@ class MainWindow(QMainWindow):
 
         colors = self._get_theme_colors()
 
-        # Update letter sequence and hero (practice UI)
         letters = list(target)
         match_len = 0
         for i in range(min(len(typed or ""), len(target))):
@@ -2373,6 +2205,7 @@ class MainWindow(QMainWindow):
         self.task_display.setText(html_text)
 
     def _set_input_error_state(self, is_error: bool) -> None:
+        """Toggle the hidden input box border between normal and error styles."""
         if self._input_has_error == is_error:
             return
         self._input_has_error = is_error
@@ -2409,6 +2242,7 @@ class MainWindow(QMainWindow):
             """)
 
     def _apply_responsive_fonts(self) -> None:
+        """Set initial font sizes for the task display and input box based on screen height."""
         screen = self.screen()
         if screen is None:
             return

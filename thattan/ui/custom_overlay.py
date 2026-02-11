@@ -24,6 +24,7 @@ _PRIMARY_LIGHT = "#4fb3bf"
 
 
 def _themed_card_container(radius: int = 20, object_name: str = "overlayContainer") -> QFrame:
+    """Create a styled card container with shadow for overlay dialogs."""
     container = QFrame()
     container.setObjectName(object_name)
     container.setMinimumWidth(400)
@@ -46,6 +47,7 @@ def _themed_card_container(radius: int = 20, object_name: str = "overlayContaine
 
 
 def _overlay_background(parent: QWidget, on_click: Callable[[], None]) -> QWidget:
+    """Create a semi-transparent overlay background that dismisses on click."""
     overlay_bg = QWidget(parent)
     overlay_bg.setStyleSheet("background: rgba(0, 0, 0, 0.2);")
     overlay_bg.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -56,6 +58,7 @@ def _overlay_background(parent: QWidget, on_click: Callable[[], None]) -> QWidge
 
 
 def _secondary_button_style() -> str:
+    """Return stylesheet for secondary (outline) buttons."""
     return """
         QPushButton {
             background: #fafafa;
@@ -75,6 +78,7 @@ def _secondary_button_style() -> str:
 
 
 def _primary_button_style() -> str:
+    """Return stylesheet for primary (filled) buttons."""
     return f"""
         QPushButton {{
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
@@ -94,6 +98,7 @@ class _OverlayBase(QWidget):
     """Shared geometry-tracking behaviour for in-window overlays."""
 
     def _update_geometry(self) -> None:
+        """Resize overlay to match parent widget bounds."""
         parent = self.parentWidget()
         if parent is not None:
             self.setGeometry(parent.rect())

@@ -1,3 +1,5 @@
+"""Application entry point and setup for the Thattan typing tutor."""
+
 import logging
 import sys
 from pathlib import Path
@@ -11,6 +13,7 @@ from thattan.ui.main_window import MainWindow
 
 
 def configure_logging() -> None:
+    """Configure application-wide logging with a standard format."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -18,15 +21,13 @@ def configure_logging() -> None:
 
 
 def load_application_font(app: QApplication) -> None:
-    """Load and set TAU-Marutham as the default font for the application"""
-    # Get the font file path
+    """Load and set TAU-Marutham as the default font for the application."""
     font_path = Path(__file__).parent / "assets" / "TAU-Marutham.ttf"
     
     if not font_path.exists():
         logging.warning(f"Font file not found: {font_path}")
         return
-    
-    # Load the font
+
     font_id = QFontDatabase.addApplicationFont(str(font_path))
     if font_id == -1:
         logging.warning(f"Failed to load font: {font_path}")
@@ -39,7 +40,6 @@ def load_application_font(app: QApplication) -> None:
 
     font_family = font_families[0]
 
-    # Set as default application font (Qt + widgets)
     # Keep TAU-Marutham for Tamil text, but allow emoji fonts as fallbacks so
     # symbols like 🔥 ⭐ 🎯 render properly on Linux/Windows/macOS.
     app_font = QFont(font_family)
@@ -57,7 +57,7 @@ def load_application_font(app: QApplication) -> None:
         # Older bindings may not support setFamilies; Qt will still try fallback fonts.
         pass
 
-    app_font.setPointSize(11)  # default size; UI can override per-widget
+    app_font.setPointSize(11)
     app.setFont(app_font)
     QGuiApplication.setFont(app_font)
     QApplication.setFont(app_font)
@@ -66,18 +66,17 @@ def load_application_font(app: QApplication) -> None:
 
 
 def run() -> None:
+    """Initialize the application, load resources, and start the main window."""
     configure_logging()
     app = QApplication(sys.argv)
     app.setApplicationName("Thattan")
     app.setApplicationDisplayName("Thattan")
 
-    # Load and set the Tamil font as default
     load_application_font(app)
 
     levels = LevelRepository()
     progress_store = ProgressStore()
 
-    # Window icon (taskbar / title bar)
     logo_dir = Path(__file__).parent / "assets" / "logo"
     for name in ("logo_256.png", "logo.svg"):
         icon_path = logo_dir / name

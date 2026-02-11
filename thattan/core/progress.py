@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LevelProgress:
+    """Progress for a single level: tasks completed and best scores achieved."""
+
     completed: int = 0
     best_wpm: float = 0.0
     best_accuracy: float = 0.0
@@ -25,6 +27,7 @@ class ProgressStore:
     File: ~/.thattan/progress.json. Cleared only when user presses reset progress."""
 
     def __init__(self) -> None:
+        """Initialize the store and load existing progress from disk."""
         self._file_path = Path.home() / ".thattan" / "progress.json"
         self._file_path.parent.mkdir(parents=True, exist_ok=True)
         self._progress, self._gamification = self._load()
@@ -61,6 +64,7 @@ class ProgressStore:
         current_streak: int,
         best_streak: int,
     ) -> None:
+        """Update gamification stats (total score, current streak, best streak)."""
         self._gamification["total_score"] = total_score
         self._gamification["current_streak"] = current_streak
         self._gamification["best_streak"] = max(self._gamification.get("best_streak", 0), best_streak)

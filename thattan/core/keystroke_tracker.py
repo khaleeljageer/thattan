@@ -32,11 +32,8 @@ class Tamil99KeyboardLayout:
     - Consonant + same consonant = pulli on first (e.g., க்க = hh)
     """
     
-    # Reverse mapping: Tamil character -> keystroke sequence
-    # Based on official Tamil99 m17n file mappings - embedded directly in code
-    # This comprehensive mapping includes all Tamil characters and their keystroke sequences
+    # Tamil character -> keystroke sequence (official Tamil99 m17n mappings)
     CHAR_TO_KEYSTROKES: Dict[str, str] = {
-        # ===== Standalone Vowels =====
         'அ': 'a', 'ஆ': 'q', 'இ': 's', 'ஈ': 'w',
         'உ': 'd', 'ஊ': 'e', 'எ': 'g', 'ஏ': 't',
         'ஐ': 'r', 'ஒ': 'c', 'ஓ': 'x', 'ஔ': 'z',
@@ -249,49 +246,36 @@ class Tamil99KeyboardLayout:
             if char == ' ':
                 sequence.append(('Space', False))
                 i += 1
-                continue  # Skip to next iteration after handling space
-            # First, check for combined characters (consonant + vowel sign)
-            # This handles cases like "டு" which should be "od", not "o" + "^d"
+                continue
             elif i + 1 < len(tamil_text):
                 combined = char + tamil_text[i + 1]
                 if combined in cls.CHAR_TO_KEYSTROKES:
-                    # Found a combined character (e.g., "டு" = "od")
                     key_seq = cls.CHAR_TO_KEYSTROKES[combined]
-                    # Process the key sequence
                     for k in key_seq:
                         is_upper = k.isupper()
                         sequence.append((k.upper(), is_upper))
                     i += 2
                     continue
-                # Combined not found, fall through to check single character
-            # Check if current character is in mapping
             if char in cls.CHAR_TO_KEYSTROKES:
                 key_seq = cls.CHAR_TO_KEYSTROKES[char]
-                # Process each key in the sequence
-                # Handle special prefixes like ^, ^#
                 if key_seq.startswith('^#'):
-                    # Tamil numeral: ^#1 -> press ^ then # then 1
                     sequence.append(('^', False))
                     sequence.append(('#', False))
                     if len(key_seq) > 2:
                         num_key = key_seq[2]
                         sequence.append((num_key.upper(), False))
                 elif key_seq.startswith('^'):
-                    # Vowel sign: ^q -> press ^ then q
-                    # But note: standalone vowel signs are rare - usually they're combined with consonants
                     sequence.append(('^', False))
                     if len(key_seq) > 1:
                         vowel_key = key_seq[1]
                         is_upper = vowel_key.isupper()
                         sequence.append((vowel_key.upper(), is_upper))
                 else:
-                    # Regular sequence: process each key
                     for k in key_seq:
                         is_upper = k.isupper()
                         sequence.append((k.upper(), is_upper))
                 i += 1
             else:
-                # Fallback for unmapped characters
                 if char.isalpha():
                     sequence.append((char.upper(), char.isupper()))
                 else:
@@ -306,12 +290,9 @@ class Tamil99KeyboardLayout:
         if char in cls.CHAR_TO_KEYSTROKES:
             key_seq = cls.CHAR_TO_KEYSTROKES[char]
             if key_seq.startswith('^#'):
-                # Tamil numeral: return the number key
                 return key_seq[2].upper() if len(key_seq) > 2 else None
             elif key_seq.startswith('^'):
-                # Vowel sign: return the vowel key after ^
                 return key_seq[1].upper() if len(key_seq) > 1 else None
-            # Regular sequence: return first key
             return key_seq[0].upper() if key_seq else None
         return None
 
@@ -421,8 +402,8 @@ class KeystrokeTracker:
             'average_response_time': round(avg_response, 2),  # ms
         }
     
-    def reset_session(self):
-        """Reset the current session"""
+    def reset_session(self) -> None:
+        """Reset the current session (clears strokes and stats)."""
         self.session_start = datetime.now()
         self.last_stroke_time = self.session_start
         self.strokes = []

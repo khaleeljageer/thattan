@@ -37,6 +37,7 @@ class CoolBackground(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
     def paintEvent(self, event) -> None:
+        """Paint the gradient background with decorative shapes."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
 
@@ -48,7 +49,6 @@ class CoolBackground(QWidget):
 
         painter.setPen(Qt.NoPen)
 
-        # Soft bubble glows
         radial1 = QRadialGradient(self.width() * 0.85, self.height() * 0.15, 220)
         radial1.setColorAt(0, QColor(255, 255, 255, 70))
         radial1.setColorAt(1, QColor(255, 255, 255, 0))
@@ -69,7 +69,6 @@ class CoolBackground(QWidget):
             painter.setBrush(radial)
             painter.drawEllipse(QPoint(int(self.width() * x_ratio), int(self.height() * y_ratio)), radius, radius)
 
-        # Very subtle Tamil letters
         painter.setOpacity(0.06)
         font = painter.font()
         font.setPointSize(90)
@@ -103,6 +102,7 @@ class HomeProgressBar(QWidget):
         self.setMinimumWidth(100)
 
     def set_progress(self, value: int, max_value: int, color_start: Optional[str] = None, color_end: Optional[str] = None) -> None:
+        """Set progress value and optionally override gradient colors."""
         self._value = int(value)
         self._max_value = int(max_value) if int(max_value) > 0 else 1
         if color_start:
@@ -112,12 +112,12 @@ class HomeProgressBar(QWidget):
         self.update()
 
     def paintEvent(self, event) -> None:
+        """Paint the rounded gradient progress bar."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
         painter.setRenderHint(QPainter.TextAntialiasing, True)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
 
-        # Track
         if self._track_color:
             painter.setBrush(QColor(self._track_color))
         else:
@@ -138,7 +138,6 @@ class HomeProgressBar(QWidget):
                 painter.setBrush(QColor(255, 255, 255, 60))
                 painter.drawRoundedRect(0, 0, progress_width, max(2, self.height() // 2), radius, radius)
 
-            # Percentage on fill (e.g. "25%")
             if self._show_percentage and self._max_value > 0:
                 pct = round((self._value / self._max_value) * 100)
                 painter.setPen(Qt.NoPen)
@@ -214,16 +213,19 @@ class ProgressCard(QFrame):
         self._bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def set_progress(self, current: int, total: int) -> None:
+        """Update progress bar and fraction label (current/total)."""
         total = max(1, total)
         self._bar.set_progress(current, total, HomeColors.PROGRESS_FILL, HomeColors.PROGRESS_FILL)
         pct = round((current / total) * 100)
         self._fraction_label.setText(f"{current}/{total} ({pct}%)")
 
     def setRange(self, min_val: int, max_val: int) -> None:
+        """Set the progress bar range (Qt-compatible API)."""
         self._bar._max_value = max(1, max_val)
         self.set_progress(min_val, self._bar._max_value)
 
     def setValue(self, value: int) -> None:
+        """Set the progress value (Qt-compatible API)."""
         self.set_progress(value, self._bar._max_value)
 
 
@@ -250,6 +252,8 @@ class GlassCard(QFrame):
 
 
 class HomeStatCard(QFrame):
+    """Stat card with icon, label, and value displayed on a colored gradient background."""
+
     def __init__(self, icon: str, label: str, value: str, bg_color: str, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._bg_color = bg_color
@@ -281,6 +285,7 @@ class HomeStatCard(QFrame):
         self.setGraphicsEffect(shadow)
 
     def set_value(self, value: str) -> None:
+        """Update the displayed value."""
         self.value_label.setText(str(value))
 
 
@@ -321,7 +326,6 @@ class HomeLevelRowCard(QFrame):
         layout.setContentsMargins(18, 14, 18, 14)
         layout.setSpacing(16)
 
-        # Icon container
         icon_container = QFrame()
         icon_container.setFixedSize(56, 56)
         icon_container.setObjectName("levelIconBox")
@@ -357,7 +361,6 @@ class HomeLevelRowCard(QFrame):
 
         layout.addWidget(icon_container)
 
-        # Info section
         info_widget = QWidget()
         info_layout = QVBoxLayout(info_widget)
         info_layout.setContentsMargins(0, 0, 0, 0)
@@ -454,6 +457,7 @@ class HomeLevelRowCard(QFrame):
         self.setGraphicsEffect(shadow)
 
     def _apply_style(self) -> None:
+        """Apply card style based on selected/unlocked state."""
         if self._selected:
             self.setStyleSheet(
                 f"""
@@ -480,12 +484,14 @@ class HomeLevelRowCard(QFrame):
 
     @staticmethod
     def _progress_percent(current: int, total: int) -> int:
+        """Return completion percentage (0-100)."""
         if total <= 0:
             return 0
         return round((current / total) * 100)
 
     @staticmethod
     def _progress_color(current: int, total: int) -> str:
+        """Return color based on progress: CORAL (<30%), AMBER (<70%), MINT (≥70%)."""
         if total <= 0:
             return HomeColors.TEXT_MUTED
         percent = (current / total) * 100
@@ -498,6 +504,7 @@ class HomeLevelRowCard(QFrame):
         return HomeColors.MINT
 
     def set_selected(self, selected: bool) -> None:
+        """Set whether this card is selected (affects border and background)."""
         self._selected = bool(selected)
         self._apply_style()
 

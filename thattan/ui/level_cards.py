@@ -37,6 +37,7 @@ class LevelCard(QWidget):
         on_click: Callable[[str], None],
         parent: Optional[QWidget] = None,
     ) -> None:
+        """Create a level card with given colors and click handler."""
         super().__init__(parent)
         self._base_color = base_color
         self._on_click = on_click
@@ -52,7 +53,6 @@ class LevelCard(QWidget):
         self.setMouseTracking(True)
         self.setCursor(Qt.PointingHandCursor)
 
-        # Header strip
         header = QWidget()
         header.setObjectName("levelCardHeader")
         header_layout = QHBoxLayout(header)
@@ -72,20 +72,17 @@ class LevelCard(QWidget):
         header_layout.addWidget(self._title, 1)
         header_layout.addWidget(self._lock_badge, 0, Qt.AlignRight)
 
-        # Center: percent/lock/check
         self._center = QLabel("")
         self._center.setObjectName("levelCardCenter")
         self._center.setAlignment(Qt.AlignCenter)
         self._center.setMinimumHeight(86)
 
-        # Start pill for the current playable level
         self._start_pill = QLabel("காண்போம்")
         self._start_pill.setObjectName("levelCardStartPill")
         self._start_pill.setAlignment(Qt.AlignCenter)
         self._start_pill.setFixedHeight(30)
         self._start_pill.setVisible(False)
 
-        # XP bar + text
         self._xp_bar = QProgressBar()
         self._xp_bar.setObjectName("levelCardXpBar")
         self._xp_bar.setTextVisible(False)
@@ -107,7 +104,6 @@ class LevelCard(QWidget):
         layout.addWidget(self._xp_bar)
         layout.addWidget(self._progress_text)
 
-        # Soft shadow like the reference cards
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(26)
         shadow.setOffset(0, 10)
@@ -117,6 +113,7 @@ class LevelCard(QWidget):
         self._apply_styles()
 
     def _apply_styles(self) -> None:
+        """Apply card stylesheet from base color (gradient, borders)."""
         card_top = blend_hex(self._base_color, "#FFFFFF", 0.18)
         card_bottom = blend_hex(self._base_color, "#000000", 0.08)
         self.setStyleSheet(
@@ -178,6 +175,7 @@ class LevelCard(QWidget):
         )
 
     def set_state(self, state: LevelState) -> None:
+        """Update card display from level state (title, progress, lock, completion)."""
         task_count = max(1, len(state.level.tasks))
         completed = max(0, min(int(state.completed), task_count))
         self._level_key = state.level.key
@@ -212,15 +210,16 @@ class LevelCard(QWidget):
         self.update()
 
     def mousePressEvent(self, event) -> None:
+        """Handle click: invoke on_click if unlocked."""
         if self._unlocked and self._level_key:
             self._on_click(self._level_key)
         super().mousePressEvent(event)
 
     def paintEvent(self, event) -> None:
+        """Paint the card; draws progress ring behind center label when applicable."""
         super().paintEvent(event)
         if (not self._unlocked) or self._is_completed:
             return
-        # Draw progress ring behind the center label
         r = self._center.geometry()
         size = min(r.width(), r.height())
         pad = max(10, int(size * 0.15))
@@ -234,14 +233,12 @@ class LevelCard(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
 
-        # background ring
         bg_pen = QPen(QColor(255, 255, 255, 90))
         bg_pen.setWidth(max(6, int(ring_rect.width() * 0.09)))
         bg_pen.setCapStyle(Qt.RoundCap)
         painter.setPen(bg_pen)
         painter.drawArc(ring_rect, 90 * 16, -360 * 16)
 
-        # progress arc
         grad = QLinearGradient(ring_rect.topLeft(), ring_rect.bottomRight())
         grad.setColorAt(0.0, QColor(255, 255, 255, 230))
         grad.setColorAt(1.0, QColor(255, 255, 255, 170))
@@ -260,16 +257,15 @@ class LevelMapWidget(QWidget):
         on_level_clicked: Callable[[str], None],
         parent: Optional[QWidget] = None,
     ) -> None:
+        """Create a level map with cards and connectors; on_level_clicked(key) on card click."""
         super().__init__(parent)
         self._on_level_clicked = on_level_clicked
         self._cards: list[LevelCard] = []
 
-        # Palette inspired by the reference screen
         self._palette = ["#19A7D9", "#F5B23B", "#F26A5A", "#F0A93B", "#2FBF93", "#4D79FF"]
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet("background: transparent;")
 
-        # Relative positions (x,y) in [0..1] for the first few nodes
         self._positions = [
             (0.14, 0.18),
             (0.50, 0.05),
@@ -280,6 +276,7 @@ class LevelMapWidget(QWidget):
         ]
 
     def set_level_states(self, states: list[LevelState]) -> None:
+        """Create or update level cards and connectors from states."""
         while len(self._cards) < len(states):
             idx = len(self._cards)
             card = LevelCard(
@@ -301,17 +298,18 @@ class LevelMapWidget(QWidget):
         self.update()
 
     def resizeEvent(self, event) -> None:
+        """Recompute card positions when widget is resized."""
         super().resizeEvent(event)
         self._relayout_cards()
 
     def _relayout_cards(self) -> None:
+        """Position visible cards using preset positions or fallback grid."""
         visible = [c for c in self._cards if c.isVisible()]
         if not visible:
             return
         w = max(1, self.width())
         h = max(1, self.height())
 
-        # A bit smaller + closer to the reference sizing
         card_w = max(170, min(250, int(w * 0.22)))
         card_h = max(160, min(225, int(card_w * 0.84)))
 
@@ -322,7 +320,6 @@ class LevelMapWidget(QWidget):
             if i < len(self._positions):
                 rx, ry = self._positions[i]
             else:
-                # fallback: a gentle grid
                 cols = 3
                 row = i // cols
                 col = i % cols
@@ -333,6 +330,7 @@ class LevelMapWidget(QWidget):
             card.setGeometry(x, y, card_w, card_h)
 
     def paintEvent(self, event) -> None:
+        """Paint Bezier connectors between visible level cards."""
         super().paintEvent(event)
         visible = [c for c in self._cards if c.isVisible()]
         if len(visible) < 2:

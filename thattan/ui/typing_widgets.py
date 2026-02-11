@@ -22,21 +22,23 @@ class LetterSequenceWidget(QWidget):
         self.setMinimumWidth(200)
 
     def set_letters(self, letters: list[str]) -> None:
+        """Set the letter sequence to display."""
         self._letters = list(letters)
         self.update()
 
     def set_current(self, index: int) -> None:
+        """Set the index of the current letter (clamped to valid range)."""
         self._current_index = max(0, min(index, len(self._letters)))
         self.update()
 
     def paintEvent(self, event) -> None:
+        """Paint the letter sequence boxes (completed, current, upcoming)."""
         super().paintEvent(event)
         if not self._letters:
             return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
 
-        # Use scale factor stored by main window (defaults to 1.0)
         s: float = getattr(self, "_scale", 1.0)
         box_size = max(28, int(44 * s))
         spacing = max(4, int(10 * s))

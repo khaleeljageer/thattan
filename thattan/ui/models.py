@@ -9,6 +9,8 @@ from thattan.core.levels import Level
 
 @dataclass
 class LevelState:
+    """UI state for a single level: progress, unlock status, and selection."""
+
     level: Level
     unlocked: bool
     completed: int

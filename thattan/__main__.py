@@ -1,3 +1,5 @@
+"""Entry point for running Thattan as a module: python -m thattan."""
+
 from thattan.app import run
 
 

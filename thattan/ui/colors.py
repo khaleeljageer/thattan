@@ -25,7 +25,6 @@ class HomeColors:
     TEXT_SECONDARY = "#4a6572"
     TEXT_MUTED = "#78909c"
 
-    # Progress card (முன்னேற்றம்) – light glass bar
     PROGRESS_CARD_BG = "#f8fcfd"
     PROGRESS_TRACK = "#e6f0f0"
     PROGRESS_FILL = "#107878"
