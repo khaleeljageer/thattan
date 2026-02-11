@@ -35,8 +35,15 @@ class LetterSequenceWidget(QWidget):
             return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
-        box_size = 44
-        spacing = 10
+
+        # Use scale factor stored by main window (defaults to 1.0)
+        s: float = getattr(self, "_scale", 1.0)
+        box_size = max(28, int(44 * s))
+        spacing = max(4, int(10 * s))
+        radius = max(6, int(10 * s))
+        current_pt = max(10, int(16 * s))
+        other_pt = max(9, int(14 * s))
+
         total_width = len(self._letters) * (box_size + spacing) - spacing
         start_x = max(0, (self.width() - total_width) // 2)
         y = (self.height() - box_size) // 2
@@ -57,10 +64,10 @@ class LetterSequenceWidget(QWidget):
                 painter.setPen(QPen(QColor("#b0bec5"), 1))
                 text_color = QColor("#b0bec5")
                 display = letter
-            painter.drawRoundedRect(x, y, box_size, box_size, 10, 10)
+            painter.drawRoundedRect(x, y, box_size, box_size, radius, radius)
             painter.setPen(text_color)
             font = painter.font()
-            font.setPointSize(16 if i == self._current_index else 14)
+            font.setPointSize(current_pt if i == self._current_index else other_pt)
             font.setBold(i == self._current_index)
             painter.setFont(font)
             painter.drawText(x, y, box_size, box_size, Qt.AlignCenter, display)

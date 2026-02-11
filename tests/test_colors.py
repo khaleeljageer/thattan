@@ -50,7 +50,8 @@ class TestBlendHexHappy:
 
     def test_returns_uppercase_hex(self):
         result = blend_hex("#ff0000", "#00ff00", 0.5)
-        assert result == result.upper() or result.startswith("#")
+        assert result.startswith("#")
+        assert result == result.upper()
 
     def test_quarter_blend(self):
         result = blend_hex("#000000", "#FF0000", 0.25)

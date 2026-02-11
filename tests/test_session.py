@@ -191,7 +191,7 @@ class TestNetWpm:
     def test_perfect_typing_net_equals_gross(self):
         """With zero errors, net WPM should equal gross WPM."""
         s = TypingSession(["abc"])
-        result = s.submit("abc")
+        s.submit("abc")
         gross = s.aggregate_gross_wpm()
         net = s.aggregate_wpm()
         assert net == pytest.approx(gross)

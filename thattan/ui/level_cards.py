@@ -39,7 +39,6 @@ class LevelCard(QWidget):
     ) -> None:
         super().__init__(parent)
         self._base_color = base_color
-        self._text_color = text_color
         self._on_click = on_click
         self._level_key: str = ""
         self._unlocked: bool = True
@@ -264,7 +263,6 @@ class LevelMapWidget(QWidget):
         super().__init__(parent)
         self._on_level_clicked = on_level_clicked
         self._cards: list[LevelCard] = []
-        self._states: list[LevelState] = []
 
         # Palette inspired by the reference screen
         self._palette = ["#19A7D9", "#F5B23B", "#F26A5A", "#F0A93B", "#2FBF93", "#4D79FF"]
@@ -282,7 +280,6 @@ class LevelMapWidget(QWidget):
         ]
 
     def set_level_states(self, states: list[LevelState]) -> None:
-        self._states = states
         while len(self._cards) < len(states):
             idx = len(self._cards)
             card = LevelCard(

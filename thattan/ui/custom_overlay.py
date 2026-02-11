@@ -51,7 +51,7 @@ def _overlay_background(parent: QWidget, on_click: Callable[[], None]) -> QWidge
     overlay_bg.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     overlay_bg.setCursor(Qt.CursorShape.ArrowCursor)
     overlay_bg.setMinimumSize(1, 1)
-    overlay_bg.mousePressEvent = lambda e: on_click()
+    overlay_bg.mousePressEvent = lambda _: on_click()
     return overlay_bg
 
 
@@ -90,7 +90,38 @@ def _primary_button_style() -> str:
     """
 
 
-class ResetConfirmOverlay(QWidget):
+class _OverlayBase(QWidget):
+    """Shared geometry-tracking behaviour for in-window overlays."""
+
+    def _update_geometry(self) -> None:
+        parent = self.parentWidget()
+        if parent is not None:
+            self.setGeometry(parent.rect())
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._update_geometry()
+
+    def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
+        if obj is self.parentWidget() and event.type() == QEvent.Type.Resize:
+            self._update_geometry()
+        return super().eventFilter(obj, event)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._update_geometry()
+        parent = self.parentWidget()
+        if parent is not None:
+            parent.installEventFilter(self)
+
+    def hideEvent(self, event) -> None:
+        parent = self.parentWidget()
+        if parent is not None:
+            parent.removeEventFilter(self)
+        super().hideEvent(event)
+
+
+class ResetConfirmOverlay(_OverlayBase):
     """In-window overlay to confirm reset progress."""
 
     closed = Signal(bool)  # True if user confirmed reset
@@ -168,40 +199,9 @@ class ResetConfirmOverlay(QWidget):
 
         content.addLayout(btn_row)
         main_layout.addWidget(container, 0, 0, 1, 1, Qt.AlignCenter)
-        self._add_overlay_geometry_behavior()
-
-    def _add_overlay_geometry_behavior(self) -> None:
-        def _update_geometry() -> None:
-            parent = self.parentWidget()
-            if parent is not None:
-                self.setGeometry(parent.rect())
-
-        self._update_geometry = _update_geometry
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self._update_geometry()
-
-    def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
-        if obj is self.parentWidget() and event.type() == QEvent.Type.Resize:
-            self._update_geometry()
-        return super().eventFilter(obj, event)
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        self._update_geometry()
-        parent = self.parentWidget()
-        if parent is not None:
-            parent.installEventFilter(self)
-
-    def hideEvent(self, event) -> None:
-        parent = self.parentWidget()
-        if parent is not None:
-            parent.removeEventFilter(self)
-        super().hideEvent(event)
 
 
-class LevelCompletedOverlay(QWidget):
+class LevelCompletedOverlay(_OverlayBase):
     """In-window overlay shown when user completes a level."""
 
     closed = Signal()
@@ -262,34 +262,3 @@ class LevelCompletedOverlay(QWidget):
         content.addWidget(ok_btn, 0)
 
         main_layout.addWidget(container, 0, 0, 1, 1, Qt.AlignCenter)
-        self._add_overlay_geometry_behavior()
-
-    def _add_overlay_geometry_behavior(self) -> None:
-        def _update_geometry() -> None:
-            parent = self.parentWidget()
-            if parent is not None:
-                self.setGeometry(parent.rect())
-
-        self._update_geometry = _update_geometry
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self._update_geometry()
-
-    def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
-        if obj is self.parentWidget() and event.type() == QEvent.Type.Resize:
-            self._update_geometry()
-        return super().eventFilter(obj, event)
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        self._update_geometry()
-        parent = self.parentWidget()
-        if parent is not None:
-            parent.installEventFilter(self)
-
-    def hideEvent(self, event) -> None:
-        parent = self.parentWidget()
-        if parent is not None:
-            parent.removeEventFilter(self)
-        super().hideEvent(event)

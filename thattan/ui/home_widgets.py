@@ -29,47 +29,6 @@ from PySide6.QtWidgets import (
 from thattan.ui.colors import HomeColors
 
 
-class AspectRatioWidget(QWidget):
-    """Widget that maintains a fixed aspect ratio"""
-    def __init__(self, aspect_ratio: float = 2.45, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-        self._aspect_ratio = aspect_ratio
-        # Use Expanding policy for both to allow proper scaling
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-
-    def setAspectRatio(self, aspect_ratio: float) -> None:
-        """Set the aspect ratio (width/height)"""
-        self._aspect_ratio = aspect_ratio
-        self.updateGeometry()
-
-    def hasHeightForWidth(self) -> bool:
-        """Return True to indicate this widget has height-for-width behavior"""
-        return True
-
-    def heightForWidth(self, width: int) -> int:
-        """Return the height that maintains aspect ratio for given width"""
-        if width > 0:
-            return int(width / self._aspect_ratio)
-        return 400
-
-    def sizeHint(self) -> QSize:
-        """Return a size hint that maintains aspect ratio"""
-        # Default size based on aspect ratio
-        width = 980
-        height = int(width / self._aspect_ratio)
-        return QSize(width, height)
-
-    def minimumSizeHint(self) -> QSize:
-        """Return minimum size hint"""
-        return QSize(980, int(980 / self._aspect_ratio))
-
-    def resizeEvent(self, event) -> None:
-        """Override resize to maintain aspect ratio when layout doesn't respect heightForWidth"""
-        # Don't constrain height - let the layout handle it via heightForWidth
-        # This allows the keyboard to expand and show all text properly
-        super().resizeEvent(event)
-
-
 class CoolBackground(QWidget):
     """Gradient background with subtle decorative shapes (light theme)."""
 

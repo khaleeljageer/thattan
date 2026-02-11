@@ -32,32 +32,6 @@ class Tamil99KeyboardLayout:
     - Consonant + same consonant = pulli on first (e.g., க்க = hh)
     """
     
-    # Tamil99 layout mapping (key -> Tamil character for standalone display)
-    # Note: Most Tamil characters are combinations typed with multiple keys
-    LAYOUT = {
-        # Vowels (standalone)
-        'a': 'அ', 'q': 'ஆ', 's': 'இ', 'w': 'ஈ',
-        'd': 'உ', 'e': 'ஊ', 'g': 'எ', 't': 'ஏ',
-        'r': 'ஐ', 'c': 'ஒ', 'x': 'ஓ', 'z': 'ஔ',
-        
-        # Consonants
-        'h': 'க', 'j': 'ப', 'k': 'ம', 'l': 'த', ';': 'ந',
-        'v': 'வ', 'b': 'ங', 'n': 'ல', 'm': 'ர',
-        '[': 'ச', ']': 'ஞ', '/': 'ழ', 'y': 'ள', 'u': 'ற',
-        'i': 'ன', 'o': 'ட', 'p': 'ண', "'": 'ய',
-        
-        # Pulli (dead consonant marker)
-        'f': '்',
-        
-        # Grantha consonants (with Shift)
-        'Q': 'ஸ', 'W': 'ஷ', 'E': 'ஜ', 'R': 'ஹ', 'Y': 'க்ஷ',
-        
-        # Special characters
-        'A': 'ஃ',  # Aytham
-        'T': 'ஶ்ரீ',  # Sri (also 'S' can be ஸ்ரீ)
-        'S': 'ஸ்ரீ',  # Sri
-    }
-    
     # Reverse mapping: Tamil character -> keystroke sequence
     # Based on official Tamil99 m17n file mappings - embedded directly in code
     # This comprehensive mapping includes all Tamil characters and their keystroke sequences
@@ -346,7 +320,6 @@ class KeystrokeTracker:
     """Main tracker class for Tamil99 keyboard learning"""
     
     def __init__(self):
-        self.layout = Tamil99KeyboardLayout()
         self.session_start = datetime.now()
         self.strokes: List[StrokeData] = []
         self.last_stroke_time = self.session_start
@@ -357,14 +330,10 @@ class KeystrokeTracker:
             'correct_strokes': 0,
             'incorrect_strokes': 0,
             'accuracy': 0.0,
-            'character_accuracy': defaultdict(lambda: {'correct': 0, 'total': 0}),
             'key_accuracy': defaultdict(lambda: {'correct': 0, 'total': 0}),
             'common_mistakes': Counter(),
             'response_times': [],
         }
-        
-        # Learning progress
-        self.mastery_levels = defaultdict(int)  # Character -> mastery level (0-100)
     
     def record_stroke(self, pressed_key: str, expected_key: str, 
                      response_time: Optional[float] = None) -> Dict:
@@ -462,7 +431,6 @@ class KeystrokeTracker:
             'correct_strokes': 0,
             'incorrect_strokes': 0,
             'accuracy': 0.0,
-            'character_accuracy': defaultdict(lambda: {'correct': 0, 'total': 0}),
             'key_accuracy': defaultdict(lambda: {'correct': 0, 'total': 0}),
             'common_mistakes': Counter(),
             'response_times': [],

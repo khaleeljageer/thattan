@@ -3,12 +3,11 @@ from __future__ import annotations
 import html
 import re
 import os
-import logging
 import time
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, QDateTime, QTimer, QSize, QPropertyAnimation, QEventLoop
+from PySide6.QtCore import Qt, QTimer, QSize, QPropertyAnimation, QEventLoop
 from PySide6.QtGui import (
     QCloseEvent,
     QColor,
@@ -45,7 +44,6 @@ from thattan.ui.about_overlay import AboutOverlay
 from thattan.ui.colors import HomeColors
 from thattan.ui.custom_overlay import ResetConfirmOverlay, LevelCompletedOverlay
 from thattan.ui.home_widgets import (
-    AspectRatioWidget,
     CoolBackground,
     GlassCard,
     HomeLevelRowCard,
@@ -53,7 +51,6 @@ from thattan.ui.home_widgets import (
     HomeStatCard,
     ProgressCard,
 )
-from thattan.ui.level_cards import LevelCard, LevelMapWidget
 from thattan.ui.models import LevelState
 from thattan.ui.typing_widgets import HeroLetterLabel, LetterSequenceWidget
 
@@ -72,7 +69,6 @@ class MainWindow(QMainWindow):
         self._left_shift_label: Optional[QLabel] = None
         self._right_shift_label: Optional[QLabel] = None
         self._current_task_text: str = ""
-        self._task_display_offset: int = 0
         self._unlock_all_levels = os.environ.get("THATTAN_UNLOCK_ALL") == "1"
         self._input_has_error = False
 
@@ -88,10 +84,9 @@ class MainWindow(QMainWindow):
         # Keystroke tracking
         self._keystroke_tracker = KeystrokeTracker()
         self._tamil99_layout = Tamil99KeyboardLayout()
-        self._keycaps_map, self._char_to_key = self._load_tamil99_maps()
+        self._keycaps_map, _ = self._load_tamil99_maps()
         self._keystroke_sequence: list[tuple[str, bool]] = []  # (key, needs_shift)
         self._keystroke_index: int = 0
-        self._char_to_keystroke_map: dict[int, int] = {}  # char_index -> keystroke_index
         self._typed_keystrokes: list[str] = []  # Track actual keys pressed
         self._typed_tamil_text: str = ""  # Track typed Tamil text
         
@@ -124,11 +119,23 @@ class MainWindow(QMainWindow):
         self._typing_correct_label: Optional[QLabel] = None
         self._typing_wrong_label: Optional[QLabel] = None
         self._typing_stats_timer: Optional[QTimer] = None
+        self._typing_stats_panel: Optional[GlassCard] = None
+        self._typing_practice_card: Optional[GlassCard] = None
+        self._typing_header: Optional[QWidget] = None
+        self._typing_feedback_label: Optional[QLabel] = None
+        self._level_pill: Optional[QFrame] = None
+        # Stat section muted/sub labels (for responsive font scaling)
+        self._stat_time_header: Optional[QLabel] = None
+        self._stat_wpm_header: Optional[QLabel] = None
+        self._stat_wpm_sub: Optional[QLabel] = None
+        self._stat_cpm_header: Optional[QLabel] = None
+        self._stat_cpm_sub: Optional[QLabel] = None
+        self._stat_acc_header: Optional[QLabel] = None
+        self._stat_streak_header: Optional[QLabel] = None
+        self._stat_correct_sub: Optional[QLabel] = None
+        self._stat_wrong_sub: Optional[QLabel] = None
 
         # Home screen widgets
-        self._header_datetime_label: Optional[QLabel] = None
-        self._header_timer: Optional[QTimer] = None
-        self._level_map: Optional[LevelMapWidget] = None  # legacy (older home UI)
         self._points_card: Optional[HomeStatCard] = None
         self._streak_card: Optional[HomeStatCard] = None
         self._best_streak_card: Optional[HomeStatCard] = None
@@ -390,40 +397,6 @@ class MainWindow(QMainWindow):
             }}
         """
 
-    def _calculate_keyboard_dimensions(self) -> tuple[float, int, int]:
-        """Calculate keyboard aspect ratio and optimal size based on screen size.
-        
-        Uses optimal dimensions from 1920x1200 screen (1402x424) as reference
-        and scales proportionally for other screen sizes.
-        
-        Returns:
-            tuple: (aspect_ratio, min_width, min_height)
-        """
-        screen = QGuiApplication.primaryScreen()
-        
-        # Reference dimensions from 1920x1200 screen that looked good
-        reference_screen_width = 1920
-        reference_keyboard_width = 1402
-        reference_keyboard_height = 424
-        reference_ratio = reference_keyboard_width / reference_keyboard_height  # ≈ 3.31
-        
-        if screen is None:
-            # Fallback to default dimensions if screen is not available
-            return (reference_ratio, 980, int(980 / reference_ratio))
-        
-        screen_width = screen.availableGeometry().width()
-        
-        # Calculate scale factor based on screen width
-        # Use screen width as primary dimension for scaling
-        scale_factor = screen_width / reference_screen_width
-        
-        # Calculate keyboard dimensions for current screen
-        # Ensure minimum size but scale up for larger screens
-        min_width = max(980, int(reference_keyboard_width * scale_factor))
-        min_height = int(min_width / reference_ratio)
-        
-        return (reference_ratio, min_width, min_height)
-
     def _build_ui(self) -> None:
         self.setWindowTitle("தட்டான் - தமிழ்99 பயிற்சி")
         self.setMinimumSize(1200, 800)
@@ -682,6 +655,7 @@ class MainWindow(QMainWindow):
 
         # Header: back + center teal pill (level name) — no extra top/bottom padding, match children height
         typing_header = QWidget()
+        self._typing_header = typing_header
         typing_header.setFixedHeight(48)
         typing_header.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         header_row = QHBoxLayout(typing_header)
@@ -705,6 +679,7 @@ class MainWindow(QMainWindow):
         header_row.addWidget(self._back_button, 0)
         header_row.addStretch(1)
         level_pill = QFrame()
+        self._level_pill = level_pill
         level_pill.setFixedHeight(48)
         level_pill.setStyleSheet(f"""
             QFrame {{
@@ -785,7 +760,8 @@ class MainWindow(QMainWindow):
             return row
 
         # --- Time ---
-        stats_layout.addWidget(_muted_label("⏱️ நேரம்"))
+        self._stat_time_header = _muted_label("⏱️ நேரம்")
+        stats_layout.addWidget(self._stat_time_header)
         self._typing_time_label = QLabel("0:00")
         self._typing_time_label.setStyleSheet(f"color: {HomeColors.PRIMARY}; font-size: 36px; font-weight: 900; font-family: monospace;")
         stats_layout.addWidget(self._typing_time_label)
@@ -795,13 +771,19 @@ class MainWindow(QMainWindow):
         # --- WPM / CPM ---
         wpm_col, self._typing_wpm_label = _stat_column("⚡ WPM", "0", "words/min")
         cpm_col, self._typing_cpm_label = _stat_column("⌨️ CPM", "0", "chars/min")
+        # Store sub-labels for rescaling (header + sub are at index 0 and 2 in each column)
+        self._stat_wpm_header = wpm_col.itemAt(0).widget()
+        self._stat_wpm_sub = wpm_col.itemAt(2).widget()
+        self._stat_cpm_header = cpm_col.itemAt(0).widget()
+        self._stat_cpm_sub = cpm_col.itemAt(2).widget()
         stats_layout.addLayout(_side_by_side(wpm_col, cpm_col))
 
         _add_divider()
 
         # --- Accuracy ---
         acc_header = QHBoxLayout()
-        acc_header.addWidget(_muted_label("🎯 துல்லியம்"))
+        self._stat_acc_header = _muted_label("🎯 துல்லியம்")
+        acc_header.addWidget(self._stat_acc_header)
         acc_header.addStretch(1)
         self._typing_accuracy_value = _big_value("0%", size=18)
         acc_header.addWidget(self._typing_accuracy_value)
@@ -814,7 +796,8 @@ class MainWindow(QMainWindow):
         _add_divider()
 
         # --- Streak ---
-        stats_layout.addWidget(_muted_label("🔥 தொடர்ச்சி"))
+        self._stat_streak_header = _muted_label("🔥 தொடர்ச்சி")
+        stats_layout.addWidget(self._stat_streak_header)
         streak_row = QHBoxLayout()
         self._typing_streak_label = _big_value("0", HomeColors.TEXT_PRIMARY)
         streak_row.addWidget(self._typing_streak_label)
@@ -831,6 +814,9 @@ class MainWindow(QMainWindow):
         # Remove empty header labels from correct/wrong columns
         correct_col.takeAt(0).widget().deleteLater()
         wrong_col.takeAt(0).widget().deleteLater()
+        # Store sub-labels for rescaling (index 0 is now the value, 1 is sub after deletion)
+        self._stat_correct_sub = correct_col.itemAt(1).widget()
+        self._stat_wrong_sub = wrong_col.itemAt(1).widget()
         stats_layout.addLayout(_side_by_side(correct_col, wrong_col, 36))
 
         stats_layout.addStretch(1)
@@ -963,23 +949,10 @@ class MainWindow(QMainWindow):
         self.start_shortcut.activated.connect(self._submit_task)
 
         self._apply_responsive_fonts()
-
-        # Header clock
-        if self._header_datetime_label is not None:
-            self._update_header_datetime()
-            self._header_timer = QTimer(self)
-            self._header_timer.timeout.connect(self._update_header_datetime)
-            self._header_timer.start(1000)
+        QTimer.singleShot(50, self._rescale_typing_screen)
 
         self._typing_stats_timer = QTimer(self)
         self._typing_stats_timer.timeout.connect(self._update_typing_stats_panel)
-
-    def _update_header_datetime(self) -> None:
-        if self._header_datetime_label is None:
-            return
-        # Similar to reference: "Monday, February 2, 2026 at 10:26:38 PM IST"
-        now = QDateTime.currentDateTime()
-        self._header_datetime_label.setText(now.toString("dddd, MMMM d, yyyy 'at' hh:mm:ss AP t"))
 
     def _aggregate_best_accuracy(self) -> float:
         """Best recorded accuracy across all levels (0..100)."""
@@ -1100,11 +1073,6 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(progress.completed)
         self.task_display.setText("")
         self.input_box.setText("")
-        if hasattr(self, "level_status") and self.level_status is not None:
-            self.level_status.setText(
-                f"{level.name} பயிற்சி வரிகள்: {task_count}. "
-                f"முடிந்தது: {progress.completed}/{task_count}."
-            )
         self._start_session(level, progress.completed)
         if self._typing_title_label is not None:
             level_id = re.sub(r"^level", "", level.key)
@@ -1125,7 +1093,7 @@ class MainWindow(QMainWindow):
         if self._finger_guidance_label is not None:
             self._finger_guidance_label.setVisible(False)
         self._clear_keyboard_highlight()
-        if hasattr(self, "_levels_scroll") and self._levels_scroll is not None:
+        if self._levels_scroll is not None:
             self._levels_scroll.setFocus()
 
     def _show_typing_screen(self) -> None:
@@ -1133,7 +1101,7 @@ class MainWindow(QMainWindow):
             return
         self._stack.setCurrentWidget(self._typing_screen)
         self._typing_screen.updateGeometry()
-        if hasattr(self, "input_box") and self.input_box is not None:
+        if self.input_box is not None:
             self.input_box.setFocus()
         self._update_typing_stats_panel()
         if not self._view_only_session and self._typing_stats_timer is not None:
@@ -1252,6 +1220,7 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self._update_error_overlay_geometry()
         QTimer.singleShot(10, self._adjust_adaptive_layout)  # Delay to ensure size is updated
+        QTimer.singleShot(10, self._rescale_typing_screen)
     
     def _adjust_adaptive_layout(self) -> None:
         """Adjust keyboard and finger UI sizes based on available space"""
@@ -1296,6 +1265,168 @@ class MainWindow(QMainWindow):
         if keyboard_width > 0:
             self._update_keyboard_font_sizes(keyboard_width)
     
+    def _rescale_typing_screen(self) -> None:
+        """Scale typing screen fonts and dimensions proportionally to window size.
+
+        Reference design: 1920x1080.  Every pixel dimension and font-size is
+        expressed as a fraction of window width (w) or height (h) so nothing
+        clips when the window shrinks or grows.
+        """
+        w = self.width()
+        h = self.height()
+        if w < 100 or h < 100:
+            return
+
+        # ---- reference basis (designed at 1920×1080) ----
+        REF_W = 1920
+        REF_H = 1080
+        sw = w / REF_W          # horizontal scale
+        sh = h / REF_H          # vertical scale
+        s = min(sw, sh)          # uniform scale (keeps aspect)
+
+        # ---- helper: rescale font-size inside an existing stylesheet ----
+        def _set_font(lbl: Optional[QLabel], ref_px: int) -> None:
+            if lbl is None:
+                return
+            sz = max(9, int(ref_px * s))
+            cur = lbl.styleSheet()
+            new_ss = re.sub(r"font-size:\s*\d+px", f"font-size: {sz}px", cur)
+            if new_ss == cur and "font-size:" not in cur:
+                new_ss += f" font-size: {sz}px;"
+            if new_ss != cur:
+                lbl.setStyleSheet(new_ss)
+
+        # ---- Outer typing layout margins ----
+        if self._typing_screen is not None:
+            outer_lay = self._typing_screen.layout()
+            if outer_lay is not None:
+                om = max(8, int(16 * s))
+                outer_lay.setContentsMargins(om, om, om, om)
+                outer_lay.setSpacing(max(8, int(20 * s)))
+
+        # ---- Stats panel width ----
+        stats_w = max(180, int(280 * sw))
+        if self._typing_stats_panel is not None:
+            self._typing_stats_panel.setFixedWidth(stats_w)
+            # Rescale internal margins
+            m = max(10, int(16 * s))
+            self._typing_stats_panel.layout().setContentsMargins(m, m, m, m)
+
+        # ---- Header bar ----
+        hdr_h = max(32, int(48 * sh))
+        if self._typing_header is not None:
+            self._typing_header.setFixedHeight(hdr_h)
+
+        if self._back_button is not None:
+            self._back_button.setFixedHeight(hdr_h)
+            btn_fs = max(10, int(14 * s))
+            btn_r = max(8, int(12 * s))
+            btn_px = max(10, int(24 * sw))
+            self._back_button.setStyleSheet(f"""
+                QPushButton {{
+                    border: 1px solid rgba(0,131,143,0.2);
+                    border-radius: {btn_r}px;
+                    color: {HomeColors.PRIMARY};
+                    font-size: {btn_fs}px;
+                    font-weight: 600;
+                    padding: 0 {btn_px}px;
+                }}
+                QPushButton:hover {{ background: white; border-color: {HomeColors.PRIMARY}; }}
+            """)
+
+        if self._level_pill is not None:
+            pill_r = max(8, int(12 * s))
+            self._level_pill.setFixedHeight(hdr_h)
+            self._level_pill.setStyleSheet(f"""
+                QFrame {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                        stop:0 {HomeColors.PRIMARY_LIGHT}, stop:1 {HomeColors.PRIMARY});
+                    border-radius: {pill_r}px;
+                    border: none;
+                }}
+            """)
+
+        if self._typing_title_label is not None:
+            title_fs = max(10, int(15 * s))
+            self._typing_title_label.setStyleSheet(
+                f"color: white; font-size: {title_fs}px; font-weight: 800;"
+            )
+
+        # ---- Stats: big value labels ----
+        _set_font(self._typing_time_label, 36)
+        _set_font(self._typing_wpm_label, 32)
+        _set_font(self._typing_cpm_label, 32)
+        _set_font(self._typing_accuracy_value, 18)
+        _set_font(self._typing_streak_label, 32)
+        _set_font(self._typing_best_streak_label, 13)
+        _set_font(self._typing_correct_label, 26)
+        _set_font(self._typing_wrong_label, 26)
+
+        # ---- Stats: muted / sub labels ----
+        _set_font(self._stat_time_header, 12)
+        _set_font(self._stat_wpm_header, 12)
+        _set_font(self._stat_wpm_sub, 10)
+        _set_font(self._stat_cpm_header, 12)
+        _set_font(self._stat_cpm_sub, 10)
+        _set_font(self._stat_acc_header, 12)
+        _set_font(self._stat_streak_header, 12)
+        _set_font(self._stat_correct_sub, 11)
+        _set_font(self._stat_wrong_sub, 11)
+
+        # ---- Practice area: feedback label ----
+        if self._typing_feedback_label is not None:
+            fb_sz = max(10, int(16 * s))
+            self._typing_feedback_label.setStyleSheet(
+                f"color: {HomeColors.TEXT_SECONDARY}; font-size: {fb_sz}px; font-weight: 600;"
+            )
+
+        # ---- Practice area: card margins ----
+        if self._typing_practice_card is not None:
+            pm = max(12, int(32 * s))
+            pv = max(10, int(24 * s))
+            lay = self._typing_practice_card.layout()
+            if lay is not None:
+                lay.setContentsMargins(pm, pv, pm, pv)
+                lay.setSpacing(max(8, int(20 * s)))
+
+        # ---- Hero letter ----
+        if self._hero_letter_label is not None:
+            hero_dim = max(64, int(120 * s))
+            hero_font = max(24, int(48 * s))
+            hero_radius = hero_dim // 2
+            self._hero_letter_label.setMinimumSize(hero_dim, hero_dim)
+            self._hero_letter_label.setMaximumSize(hero_dim, hero_dim)
+            self._hero_letter_label.setStyleSheet(f"""
+                QLabel {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                        stop:0 {HomeColors.PRIMARY_LIGHT}, stop:1 {HomeColors.PRIMARY});
+                    color: white;
+                    border-radius: {hero_radius}px;
+                    font-size: {hero_font}px;
+                    font-weight: 900;
+                }}
+            """)
+
+        # ---- Letter sequence boxes ----
+        if self._letter_sequence_widget is not None:
+            seq_h = max(32, int(60 * sh))
+            self._letter_sequence_widget.setFixedHeight(seq_h)
+            # Store scale for paintEvent
+            self._letter_sequence_widget._scale = s
+
+        # ---- Finger guidance label ----
+        if self._finger_guidance_label is not None:
+            fg_fs = max(10, int(16 * s))
+            fg_pad_v = max(6, int(12 * s))
+            fg_pad_h = max(8, int(16 * s))
+            fg_min_h = max(30, int(50 * s))
+            cur_ss = self._finger_guidance_label.styleSheet()
+            new_ss = re.sub(r"font-size:\s*\d+px", f"font-size: {fg_fs}px", cur_ss)
+            new_ss = re.sub(r"padding:\s*\d+px\s+\d+px", f"padding: {fg_pad_v}px {fg_pad_h}px", new_ss)
+            new_ss = re.sub(r"min-height:\s*\d+px", f"min-height: {fg_min_h}px", new_ss)
+            if new_ss != cur_ss:
+                self._finger_guidance_label.setStyleSheet(new_ss)
+
     def _update_keyboard_font_sizes(self, keyboard_width: int) -> None:
         """Update keyboard font sizes based on available width"""
         if not self._keyboard_widget:
@@ -1369,8 +1500,6 @@ class MainWindow(QMainWindow):
             if self._keystroke_index >= len(self._keystroke_sequence):
                 self._submit_task_from_keystrokes()
                 return True
-            if self._keystroke_index >= len(self._keystroke_sequence):
-                return False
             pressed_key = "Space"
         elif key == Qt.Key.Key_Backspace:
             if self._typed_keystrokes and self._keystroke_index > 0:
@@ -1590,7 +1719,6 @@ class MainWindow(QMainWindow):
     
     def _update_stats_from_tracker(self) -> None:
         """Update UI stats from keystroke tracker"""
-        self._keystroke_tracker.get_session_summary()
         self._update_gamification_stats()
 
     def _submit_task(self, typed: Optional[str] = None) -> None:
@@ -1647,11 +1775,11 @@ class MainWindow(QMainWindow):
     
     def _update_gamification_stats(self) -> None:
         """Update home UI stats (and hide combo label)."""
-        if hasattr(self, "_points_card") and self._points_card is not None:
+        if self._points_card is not None:
             self._points_card.set_value(f"{self._total_score:,}")
-        if hasattr(self, "_streak_card") and self._streak_card is not None:
+        if self._streak_card is not None:
             self._streak_card.set_value(f"{self._current_streak}")
-        if hasattr(self, "_best_streak_card") and self._best_streak_card is not None:
+        if self._best_streak_card is not None:
             self._best_streak_card.set_value(f"{self._best_streak}")
 
         # Keep accuracy bar meaningful: during a session use session aggregate; otherwise show best stored.
@@ -1661,7 +1789,7 @@ class MainWindow(QMainWindow):
             self._set_home_accuracy(self._aggregate_best_accuracy())
 
         self._update_typing_stats_panel()
-        if hasattr(self, "combo_label") and self.combo_label is not None:
+        if self.combo_label is not None:
             self.combo_label.setVisible(False)
 
     def _update_typing_stats_panel(self) -> None:
@@ -1783,17 +1911,6 @@ class MainWindow(QMainWindow):
             'special': max(10, int(base_font_size * 0.78))
         }
         
-        size_map = {
-            "Backspace": 2.0,
-            "Tab": 1.75,
-            "Caps": 2.0,
-            "Enter": 2.0,
-            "Shift": 2.5,
-            "Space": 7.5,
-            "Ctrl": 1.75,
-            "Alt": 1.0,
-        }
-
         rows = [
             [("`", 1.0), ("1", 1.0), ("2", 1.0), ("3", 1.0), ("4", 1.0), ("5", 1.0), ("6", 1.0), ("7", 1.0), ("8", 1.0), ("9", 1.0), ("0", 1.0), ("-", 1.0), ("=", 1.0), ("Backspace", 2.0)],
             [("Tab", 1.75), ("Q", 1.0), ("W", 1.0), ("E", 1.0), ("R", 1.0), ("T", 1.0), ("Y", 1.0), ("U", 1.0), ("I", 1.0), ("O", 1.0), ("P", 1.0), ("[", 1.0), ("]", 1.0), ("\\", 1.25)],
@@ -1823,16 +1940,6 @@ class MainWindow(QMainWindow):
         tamil_shift_font = self._keyboard_font_sizes['tamil_shift']
         special_font = self._keyboard_font_sizes['special']
 
-        # Use percentage-based spacing for consistent appearance across all key sizes
-        # The middle column will take 15% of the table width, ensuring uniform spacing
-        label_spacing_percent = 100
-
-        logging.info(f"Base font size: {base_font_size}")
-        logging.info(f"English font: {english_font}")
-        logging.info(f"Tamil base font: {tamil_base_font}")
-        logging.info(f"Tamil shift font: {tamil_shift_font}")
-        logging.info(f"Special font: {special_font}")
-
         for row_index, row in enumerate(rows):
             col = 0
             for key, size in row:
@@ -1851,9 +1958,6 @@ class MainWindow(QMainWindow):
                 key_width = int(unit_pixels * size * unit_scale)
                 key_height = base_key_height
                 
-                # Log each key size
-                logging.info(f"Key: {key}, Size: {size}, Width: {key_width}px, Height: {key_height}px")
-
                 label.setMinimumHeight(key_height)
                 # Don't set fixed minimum width - let grid handle it with stretch factors
                 # This allows keys to scale down when space is limited
@@ -1917,11 +2021,6 @@ class MainWindow(QMainWindow):
         
         # Ensure the grid layout has proper margins to prevent cropping
         grid.setContentsMargins(0, 0, 0, 0)
-        
-        # Store keyboard container reference for font updates
-        container._key_labels_ref = self._key_labels
-        container._shift_labels_ref = self._shift_labels
-
         return container
     
     def _rebuild_keyboard_labels(self) -> None:
@@ -2050,55 +2149,8 @@ class MainWindow(QMainWindow):
                 self._finger_guidance_label.setText(guidance_text)
                 self._finger_guidance_label.setVisible(True)
     
-    def _build_keystroke_sequence(self, text: str) -> list[tuple[str, bool]]:
-        """Build the keystroke sequence for Tamil99 text."""
-        sequence = []
-        self._char_to_keystroke_map = {}
-        keystroke_idx = 0
-        
-        for char_idx, char in enumerate(text):
-            # Get keystroke sequence from char_to_keystrokes mapping
-            if self._char_to_key and char in self._char_to_key:
-                key_seq = self._char_to_key[char]  # e.g., "oa" or "q" or "^d"
-                # Handle special sequences like "^d" or "^q"
-                # In Tamil99, "^" prefix means use the key after it (^d = press d, ^q = press q)
-                if key_seq.startswith("^"):
-                    # Extract the actual key after ^
-                    if len(key_seq) > 1:
-                        k = key_seq[1]
-                        is_upper = k.isupper()
-                        sequence.append((k.upper(), is_upper))
-                        self._char_to_keystroke_map[char_idx] = keystroke_idx
-                        keystroke_idx += 1
-                    else:
-                        # Just "^" - shouldn't happen, but handle it
-                        sequence.append(("^", False))
-                        self._char_to_keystroke_map[char_idx] = keystroke_idx
-                        keystroke_idx += 1
-                else:
-                    # Multi-character sequence like "oa" means press o then a
-                    # All keystrokes for this character map to the same char_idx
-                    for k in key_seq:
-                        is_upper = k.isupper()
-                        sequence.append((k.upper(), is_upper))
-                        keystroke_idx += 1
-                    # Map the character to the first keystroke of its sequence
-                    self._char_to_keystroke_map[char_idx] = keystroke_idx - len(key_seq)
-            else:
-                # Fallback for unmapped characters (spaces, punctuation)
-                if char == " ":
-                    sequence.append(("Space", False))
-                else:
-                    key_label, needs_shift = self._map_char_to_key(char)
-                    sequence.append((key_label, needs_shift))
-                self._char_to_keystroke_map[char_idx] = keystroke_idx
-                keystroke_idx += 1
-        
-        return sequence
-
     def _map_char_to_key(self, char: str) -> tuple[str, bool]:
-        # This is a fallback for non-Tamil characters (spaces, punctuation, etc.)
-        # Tamil characters should be handled in _build_keystroke_sequence using _char_to_key
+        # Fallback for non-Tamil characters (spaces, punctuation, etc.)
         if char == " ":
             return "Space", False
 
